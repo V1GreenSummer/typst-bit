@@ -1,0 +1,51 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "local/typstbit/typst_binding"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn compile_main(String) -> Result[Unit, TypstError]
+
+pub fn error_count(Array[Diagnostic]) -> Int
+
+pub fn error_json() -> Result[Array[Diagnostic], TypstError]
+
+pub fn page_count() -> Int
+
+pub fn page_image(Int, Int, Int) -> Result[String, TypstError]
+
+pub fn parse_diagnostics(String) -> Array[Diagnostic] raise
+
+pub fn pull_registered_text(Int) -> Result[String?, TypstError]
+
+pub fn warning_count(Array[Diagnostic]) -> Int
+
+// Errors
+
+// Types and methods
+pub(all) struct Diagnostic {
+  severity : Severity
+  message : String
+  line : Int?
+  column : Int?
+  file : String?
+} derive(Eq, @debug.Debug)
+pub fn Diagnostic::is_error(Self) -> Bool
+
+pub(all) enum Severity {
+  Error
+  Warning
+} derive(Eq, @debug.Debug)
+
+pub(all) enum TypstError {
+  MainNotSet
+  CompileErrors
+  InvalidArgument
+  Fatal(String)
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

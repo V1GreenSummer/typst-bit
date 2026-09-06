@@ -1,0 +1,68 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "local/typstbit/app"
+
+import {
+  "local/typstbit/typst_binding",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub const DEBOUNCE_MS : Int = 300
+
+pub const DEFAULT_SOURCE : String = "#set page(width: 20cm, height: 10cm)\n= Hello, Typst!\n\n#lorem(60)"
+
+pub fn update(Model, Msg) -> (Model, Array[Action])
+
+// Errors
+
+// Types and methods
+pub(all) enum Action {
+  StartCompile(revision~ : Int, source~ : String)
+  RequestPageImage(revision~ : Int, page~ : Int)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum CompileStatus {
+  Idle
+  Compiling
+  Success(pages~ : Int, warnings~ : Int)
+  Failed(errors~ : Int, warnings~ : Int)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Model {
+  source : String
+  pending : Bool
+  deadline : Int
+  current_revision : Int
+  doc_revision : Int?
+  page_count : Int
+  current_page : Int
+  preview_source : String?
+  pending_image_page : Int?
+  preview_ready : Bool
+  preview_failed : Bool
+  status : CompileStatus
+  diagnostics : Array[@typst_binding.Diagnostic]
+} derive(Eq, @debug.Debug)
+pub fn Model::can_go_next(Self) -> Bool
+pub fn Model::can_go_prev(Self) -> Bool
+pub fn Model::init(initial_source~ : String) -> Self
+
+pub(all) enum Msg {
+  SourceEdited(source~ : String, now_ms~ : Int)
+  DebounceTick(now_ms~ : Int)
+  CompileNow
+  ResetSource(now_ms~ : Int)
+  CompileSucceeded(revision~ : Int, page_count~ : Int, warnings~ : Int)
+  CompileFailed(revision~ : Int, diagnostics~ : Array[@typst_binding.Diagnostic])
+  PreviewSource(revision~ : Int, page~ : Int, source~ : String)
+  PreviewFailed(revision~ : Int, page~ : Int)
+  ImageReady(revision~ : Int)
+  ImageFailed(revision~ : Int)
+  PrevPage
+  NextPage
+  GotoPage(page~ : Int)
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

@@ -1,0 +1,18 @@
+{
+  "name": "e2e",
+  "version": "1.0.0",
+  "description": "Typstbit browser e2e suites (see docs/acceptance.md)",
+  "main": "index.js",
+  "scripts": {
+    "loader": "node loader.mjs",
+    "acceptance": "node acceptance.mjs",
+    "browser-matrix": "node browser-matrix.mjs",
+    "fresh-build": "node fresh-build.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "playwright": "^1.63.0"
+  }
+}

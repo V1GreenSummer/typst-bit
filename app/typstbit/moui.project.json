@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "typstbit",
+  "title": "Typstbit",
+  "module": "local/typstbit",
+  "mouiVersion": "0.1.9",
+  "platforms": [
+    "web",
+    "linux"
+  ]
+}

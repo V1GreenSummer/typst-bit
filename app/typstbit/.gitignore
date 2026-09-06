@@ -1,0 +1,8 @@
+/.mooncakes/
+/_build/
+/target/
+/artifacts/
+/.skia-cache/
+*.log
+*.tmp
+.DS_Store

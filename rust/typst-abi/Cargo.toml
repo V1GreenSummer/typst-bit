@@ -1,0 +1,25 @@
+[package]
+name = "typst-abi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Flat C ABI wrapper over the typst compiler for wasm32-unknown-unknown"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["bundled-fonts"]
+# Embed the typst-assets font set into the wasm binary (design D5).
+# Disable to measure/build the fonts-free variant for the D5/D10 trade-off.
+bundled-fonts = ["typst-assets/fonts"]
+
+[dependencies]
+comemo = "0.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tiny-skia = "0.12"
+typst = "0.15.1"
+typst-assets = { version = "0.15.1", default-features = false }
+typst-layout = "0.15.1"
+typst-render = "0.15.1"

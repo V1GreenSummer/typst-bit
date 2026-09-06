@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Typstbit</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body, #canvas-host { width: 100%; height: 100%; margin: 0; }
+      body { overflow: hidden; background: #ffffff; }
+      canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+    </style>
+  </head>
+  <body>
+    <div id="canvas-host" aria-label="MoUI canvas host"></div>
+    <script type="module">
+      import { bootTypstbit } from "./loader.js";
+
+      const params = new URLSearchParams(location.search);
+      const appWasm = params.get("app") ?? new URL(
+        "../_build/wasm-gc/debug/build/web_wasm/web_wasm.wasm",
+        import.meta.url,
+      );
+      const abiWasm = params.get("abi") ?? new URL(
+        "../../../../rust/target/wasm32-unknown-unknown/release/typst_abi.wasm",
+        import.meta.url,
+      );
+
+      bootTypstbit({
+        appWasmUrl: appWasm,
+        typstAbiUrl: abiWasm,
+        canvasHost: "#canvas-host",
+      }).then(({ state }) => {
+        console.log("[typstbit] ready", {
+          fonts: state.abi.exports.spike_init?.(),
+          compileCount: state.compileCount,
+        });
+      }).catch(error => {
+        console.error("[typstbit] boot failed", error);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,45 @@
+import {
+  "wzzc-dev/moui",
+  "wzzc-dev/moui/core",
+  "wzzc-dev/moui/views",
+  "wzzc-dev/moui/views/style",
+  "wzzc-dev/moui/backend/web",
+  "wzzc-dev/moui_web_renderer" @webgpu_adapter,
+  "wzzc-dev/moui/runtime",
+  "local/typstbit/app",
+  "local/typstbit/typst_binding",
+}
+
+supported_targets = "wasm-gc"
+
+pkgtype(kind: "executable")
+
+options(
+  link: {
+    "wasm-gc": {
+      "exports": [
+        "typst_image_event",
+        "typstbit_paint_ready",
+        "typstbit_timer",
+        "e2e_status",
+        "e2e_page_count",
+        "e2e_current_page",
+        "e2e_preview_ready",
+        "e2e_revision",
+        "e2e_error_count",
+        "e2e_compiling_count",
+        "e2e_set_source",
+        "e2e_source_contains",
+        "e2e_reset_source",
+        "e2e_turn_page",
+        "web_dispatch_event",
+        "web_dispatch_pointer_input",
+        "web_dispatch_semantics_action",
+        "web_dispatch_route",
+        "web_complete_async_clipboard_read",
+        "web_complete_async_file_dialog",
+      ],
+    },
+  },
+  targets: { "main.mbt": [ "wasm-gc" ] },
+)
