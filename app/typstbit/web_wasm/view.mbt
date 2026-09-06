@@ -119,21 +119,33 @@ fn file_sidebar() -> @moui.View[ShellMsg] {
         height=26.0,
         align=@core.TextAlign::TextStart,
       ),
+      @views.spacer(min_length=40.0),
+      @views.divider(inset=0.0),
+      @views.button(
+        "⌕ 搜索",
+        on_click=Noop,
+        variant=@style.ButtonVariant::Ghost,
+        width=160.0,
+        height=28.0,
+      ),
+      @views.button(
+        "☷ 大纲",
+        on_click=Noop,
+        variant=@style.ButtonVariant::Ghost,
+        width=160.0,
+        height=28.0,
+      ),
     ],
     spacing=0.0,
     align=@style.CrossAlign::Stretch,
-  ).frame(width=166.0, height=496.0)
+  ).frame(width=180.0, height=496.0)
 }
 
 ///|
 fn editor_workspace(model : @app.Model) -> @moui.View[ShellMsg] {
-  let line_numbers = @views.text(
-    "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15",
-    role=@style.TextRole::Caption,
-    width=24.0,
-    height=440.0,
-    align=@core.TextAlign::TextEnd,
-  )
+  let line_count = count_lines(model.source)
+  let line_numbers_text = make_line_numbers(line_count)
+
   @views.column(
     [
       @views.row(
@@ -141,14 +153,14 @@ fn editor_workspace(model : @app.Model) -> @moui.View[ShellMsg] {
           @views.text(
             "main.typ",
             role=@style.TextRole::Control,
-            width=170.0,
+            width=200.0,
             height=24.0,
             align=@core.TextAlign::TextStart,
           ),
           @views.text(
             "未保存",
             role=@style.TextRole::Caption,
-            width=56.0,
+            width=60.0,
             height=24.0,
             align=@core.TextAlign::TextStart,
           ),
@@ -157,39 +169,44 @@ fn editor_workspace(model : @app.Model) -> @moui.View[ShellMsg] {
         align=@style.CrossAlign::Center,
       ),
       @views.divider(inset=0.0),
-      @views.row(
-        [
-          line_numbers,
-          @views.scroll_view(
+      @views.scroll_view(
+        @views.row(
+          [
+            @views.text(
+              line_numbers_text,
+              role=@style.TextRole::Caption,
+              width=40.0,
+              align=@core.TextAlign::TextEnd,
+            ),
             @views.text_area(
               model.source,
               on_input=text => {
                 App(@app.SourceEdited(source=text, now_ms=clock_now_ms()))
               },
               placeholder="输入 Typst 源码…",
-              lines=20,
-              variant=@style.TextFieldVariant::Plain,
-              width=200.0,
+              lines=25,
+              variant=@style.TextFieldVariant::Outline,
+              width=420.0,
               line_height=22.0,
             ),
-            width=210.0,
-            height=468.0,
-            shows_indicator=true,
-          ),
-        ],
-        spacing=4.0,
-        align=@style.CrossAlign::Start,
+          ],
+          spacing=12.0,
+          align=@style.CrossAlign::Start,
+        ),
+        width=480.0,
+        height=468.0,
+        shows_indicator=true,
       ),
     ],
     spacing=0.0,
     align=@style.CrossAlign::Stretch,
-  ).frame(width=240.0, height=496.0)
+  ).frame(width=490.0, height=496.0)
 }
 
 ///|
 fn preview_workspace(model : @app.Model) -> @moui.View[ShellMsg] {
   let canvas = match model.preview_source {
-    Some(url) => @views.image(url, width=560.0, height=280.0)
+    Some(url) => @views.image(url, width=300.0, height=300.0)
     None => preview_empty(model)
   }
   @views.column(
@@ -203,7 +220,7 @@ fn preview_workspace(model : @app.Model) -> @moui.View[ShellMsg] {
             height=24.0,
             align=@core.TextAlign::TextStart,
           ),
-          @views.spacer(min_length=20.0),
+          @views.spacer(min_length=12.0),
           @views.text(
             "⌘K 搜索命令",
             role=@style.TextRole::Caption,
@@ -211,7 +228,7 @@ fn preview_workspace(model : @app.Model) -> @moui.View[ShellMsg] {
             height=24.0,
             align=@core.TextAlign::TextStart,
           ),
-          @views.spacer(min_length=20.0),
+          @views.spacer(min_length=12.0),
           @views.button(
             "−",
             on_click=Noop,
@@ -244,11 +261,11 @@ fn preview_workspace(model : @app.Model) -> @moui.View[ShellMsg] {
         align=@style.CrossAlign::Center,
       ),
       @views.divider(inset=0.0),
-      @views.center(canvas, width=594.0, height=470.0),
+      @views.center(canvas, width=330.0, height=470.0),
     ],
     spacing=0.0,
     align=@style.CrossAlign::Stretch,
-  ).frame(width=594.0, height=496.0)
+  ).frame(width=330.0, height=496.0)
 }
 
 ///|
@@ -289,14 +306,14 @@ fn footer_bar(model : @app.Model) -> @moui.View[ShellMsg] {
       @views.text(
         "✕  \{model.diagnostics.filter(d => d.is_error()).length()} 错误",
         role=@style.TextRole::Caption,
-        width=76.0,
+        width=80.0,
         height=24.0,
         align=@core.TextAlign::TextStart,
       ),
       @views.text(
         "⚠  \{model.diagnostics.filter(d => !d.is_error()).length()} 警告",
         role=@style.TextRole::Caption,
-        width=82.0,
+        width=86.0,
         height=24.0,
         align=@core.TextAlign::TextStart,
       ),
@@ -386,4 +403,25 @@ fn status_detail(model : @app.Model) -> String {
     Failed(errors~, warnings~) =>
       "发现 \{errors} 个错误 · \{warnings} 个警告 · 已保留上次预览"
   }
+}
+
+///|
+fn count_lines(source : String) -> Int {
+  let lines = source.split("\n")
+  lines.length()
+}
+
+///|
+fn make_line_numbers(count : Int) -> String {
+  if count <= 0 {
+    return ""
+  }
+  let mut result = ""
+  for i in 1..<=count {
+    if i > 1 {
+      result = result + "\n"
+    }
+    result = result + i.to_string()
+  }
+  result
 }
