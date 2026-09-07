@@ -100,6 +100,15 @@ const screenshotPixel = async (x, y) => {
   }, { b64: shot.toString("base64"), x, y });
 };
 
+// Sample relative to an element box so checks survive layout changes.
+const pixelInBox = async (selector, fx, fy) => {
+  const pt = await page.evaluate(({ selector, fx, fy }) => {
+    const r = document.querySelector(selector).getBoundingClientRect();
+    return { x: Math.round(r.left + r.width * fx), y: Math.round(r.top + r.height * fy) };
+  }, { selector, fx, fy });
+  return screenshotPixel(pt.x, pt.y);
+};
+
 await page.goto(`http://127.0.0.1:${PORT}/app/typstbit/web_wasm/index.html`);
 
 await waitFor(() => globalThis.__typstbit?.ready, 30_000, "boot");
@@ -272,18 +281,17 @@ check("fix and recover", s.status === 2 && s.errors === 0, JSON.stringify(s));
 // --- 9. preview actually paints pixels (image bridge end-to-end) --------------
 {
   await waitFor(() => globalThis.__typstbit.app.exports.e2e_preview_ready() === 1, 30_000, "final preview ready");
-  const previewPixel = await screenshotPixel(690, 230);
+  const previewPixel = await pixelInBox(".paper img", 0.06, 0.1);
   check(
     "preview pane paints the rendered page (white page area)",
     previewPixel !== null && previewPixel[0] > 200 && previewPixel[1] > 200 && previewPixel[2] > 200,
     JSON.stringify(previewPixel),
   );
-  // The editor pane (left side) should NOT be the same as the page white:
-  // sample far left where the text area background sits.
-  const editorPixel = await screenshotPixel(30, 260);
+  // The editor pane sits on a light (not gray) background.
+  const editorPixel = await pixelInBox(".cm-scroller", 0.5, 0.95);
   check(
     "editor pane renders (differs from preview background)",
-    editorPixel !== null,
+    editorPixel !== null && editorPixel[0] > 230,
     JSON.stringify(editorPixel),
   );
 }
@@ -292,8 +300,8 @@ check("fix and recover", s.status === 2 && s.errors === 0, JSON.stringify(s));
 // complete in the source (spec "IME 提交" scenario; keyboard.insertText
 // reproduces an IME commit — input event, no keydown). -----------------------
 {
-  // Click into the editor pane (left, 380px wide) to focus the text area.
-  await page.mouse.click(190, 260);
+  // Click into the CodeMirror content to focus the editor.
+  await page.click(".cm-content");
   await page.waitForTimeout(300);
   const cjk = "中文输入法测试——段落文本。";
   await page.keyboard.insertText(cjk);
