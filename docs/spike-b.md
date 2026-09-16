@@ -19,6 +19,7 @@
 - profile：`panic=abort, opt-level="s", lto=true, codegen-units=1`（`opt-level="z"` 实测更差：39.48 MiB → 40.66 MiB，弃用）
 - 发布管线：`cargo build --target wasm32-unknown-unknown --release` → `wasm-opt -Oz --strip-debug --strip-producers`
 - `bundled-fonts` 特性（默认开）内嵌 typst-assets 字体；关闭即得 fonts-free 变体
+- 生产 `VfsWorld` 另经 `cjk-fonts` 特性内嵌 Noto Serif CJK SC GB2312 子集与 Liberation Serif（Times 度量兼容，变更 `bundle-cjk-times-fonts`，体积与预算见 `docs/acceptance.md`）；本页 Spike 世界仅含 typst-assets 字体，数字不含该增量
 - spike ABI：`spike_init / spike_alloc / spike_evict / spike_compile`（见 `rust/typst-abi/src/lib.rs`）
 - 复现：`cd rust && cargo build --target wasm32-unknown-unknown --release && npx wasm-opt target/wasm32-unknown-unknown/release/typst_abi.wasm -Oz --strip-debug --strip-producers -o typst_abi.opt.wasm && node typst-abi/spike/measure.mjs typst_abi.opt.wasm bundled-opt`
 

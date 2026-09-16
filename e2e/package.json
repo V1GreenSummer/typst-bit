@@ -7,6 +7,8 @@
     "loader": "node loader.mjs",
     "acceptance": "node acceptance.mjs",
     "browser-matrix": "node browser-matrix.mjs",
+    "interactions": "node interactions.mjs",
+    "commands": "node commands.test.mjs",
     "fresh-build": "node fresh-build.mjs",
     "build:workbench": "node build-workbench.mjs"
   },

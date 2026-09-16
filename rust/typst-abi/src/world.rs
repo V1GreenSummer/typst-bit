@@ -84,6 +84,27 @@ impl VPath {
     }
 }
 
+#[cfg(feature = "cjk-fonts")]
+fn bundled_cjk_fonts() -> Vec<Font> {
+    const FILES: [&[u8]; 6] = [
+        include_bytes!("../fonts/NotoSerifCJKsc-Regular-GB2312.otf"),
+        include_bytes!("../fonts/NotoSerifCJKsc-Bold-GB2312.otf"),
+        include_bytes!("../fonts/LiberationSerif-Regular.ttf"),
+        include_bytes!("../fonts/LiberationSerif-Bold.ttf"),
+        include_bytes!("../fonts/LiberationSerif-Italic.ttf"),
+        include_bytes!("../fonts/LiberationSerif-BoldItalic.ttf"),
+    ];
+    FILES
+        .iter()
+        .filter_map(|data| Font::new(Bytes::new(*data), 0))
+        .collect()
+}
+
+#[cfg(not(feature = "cjk-fonts"))]
+fn bundled_cjk_fonts() -> Vec<Font> {
+    Vec::new()
+}
+
 /// The in-memory virtual filesystem world (design D6).
 pub struct VfsWorld {
     library: LazyHash<Library>,
@@ -98,9 +119,10 @@ pub struct VfsWorld {
 
 impl VfsWorld {
     pub fn new() -> Self {
-        let fonts: Vec<Font> = typst_assets::fonts()
+        let mut fonts: Vec<Font> = typst_assets::fonts()
             .filter_map(|data| Font::new(Bytes::new(data), 0))
             .collect();
+        fonts.extend(bundled_cjk_fonts());
         let book = FontBook::from_fonts(&fonts);
         Self {
             library: LazyHash::new(Library::default()),

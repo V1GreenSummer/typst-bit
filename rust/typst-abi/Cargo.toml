@@ -9,10 +9,13 @@ description = "Flat C ABI wrapper over the typst compiler for wasm32-unknown-unk
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["bundled-fonts"]
+default = ["bundled-fonts", "cjk-fonts"]
 # Embed the typst-assets font set into the wasm binary (design D5).
 # Disable to measure/build the fonts-free variant for the D5/D10 trade-off.
 bundled-fonts = ["typst-assets/fonts"]
+# Embed the CJK (Noto Serif CJK SC GB2312 subset) and Times-compatible
+# (Liberation Serif) fonts (design D11/D13).
+cjk-fonts = []
 
 [dependencies]
 comemo = "0.5"
@@ -22,4 +25,5 @@ tiny-skia = "0.12"
 typst = "0.15.1"
 typst-assets = { version = "0.15.1", default-features = false }
 typst-layout = "0.15.1"
+typst-pdf = "0.15.1"
 typst-render = "0.15.1"

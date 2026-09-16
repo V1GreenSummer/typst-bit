@@ -150,26 +150,24 @@ check("blob URL created for the preview", blobInfo.created >= 1 && Boolean(blobI
 await waitFor(() => globalThis.__typstbit.app.exports.e2e_preview_ready() === 1, 30_000, "preview ready");
 check("preview image loaded (typst_image_event ready)", true);
 
-// --- 3. page navigation through the shell ------------------------------------
-await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_turn_page(1));
-let nav = await status();
-check("next page at last page is a no-op", nav.pages === 1); // single-page doc
+// --- 3. multi-page docs: page count + PDF preview attaches --------------------
 await setSource("#set page(width: 20cm, height: 10cm)\nA\n\n#pagebreak()\n\nB\n\n#pagebreak()\n\nC");
 await waitFor(() => {
   const app = globalThis.__typstbit.app;
   return app.exports.e2e_revision() >= 2 && app.exports.e2e_status() === 2;
 }, 60_000, "second compile");
-nav = await status();
+let nav = await status();
 check("multi-page doc: 3 pages", nav.pages === 3, JSON.stringify(nav));
-await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_turn_page(1));
-nav = await status();
-check("next page -> page 2", nav.status === 2 && (await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_current_page())) === 1);
-await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_turn_page(0));
-await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_turn_page(0));
-check(
-  "prev page clamps at first page",
-  (await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_current_page())) === 0,
-);
+const viewer = await page.evaluate(() => ({
+  embed: !!document.querySelector("embed.pdf-view"),
+  srcSet: (globalThis.__typstbit.currentSource ?? "").startsWith("blob:"),
+}));
+check("PDF viewer attached", viewer.embed && viewer.srcSet, JSON.stringify(viewer));
+const pdfValid = await page.evaluate(async () => {
+  const buf = await (await fetch(globalThis.__typstbit.currentSource)).arrayBuffer();
+  return String.fromCharCode(...new Uint8Array(buf.slice(0, 5)));
+});
+check("preview bytes are a PDF document", pdfValid === "%PDF-", pdfValid);
 
 // --- 4. revoke hygiene: old blob URLs are revoked after replacement ----------
 const before = await page.evaluate(() => ({
@@ -281,12 +279,16 @@ check("fix and recover", s.status === 2 && s.errors === 0, JSON.stringify(s));
 // --- 9. preview actually paints pixels (image bridge end-to-end) --------------
 {
   await waitFor(() => globalThis.__typstbit.app.exports.e2e_preview_ready() === 1, 30_000, "final preview ready");
-  const previewPixel = await pixelInBox(".paper img", 0.06, 0.1);
-  check(
-    "preview pane paints the rendered page (white page area)",
-    previewPixel !== null && previewPixel[0] > 200 && previewPixel[1] > 200 && previewPixel[2] > 200,
-    JSON.stringify(previewPixel),
-  );
+  const embedBox = await page.evaluate(() => {
+    const r = document.querySelector("embed.pdf-view")?.getBoundingClientRect();
+    return r ? { w: r.width, h: r.height, shown: r.width > 100 && r.height > 100 } : null;
+  });
+  check("preview pane shows the PDF viewer", embedBox?.shown === true, JSON.stringify(embedBox));
+  const finalPdf = await page.evaluate(async () => {
+    const buf = await (await fetch(globalThis.__typstbit.currentSource)).arrayBuffer();
+    return String.fromCharCode(...new Uint8Array(buf.slice(0, 5)));
+  });
+  check("final preview bytes are a PDF document", finalPdf === "%PDF-", finalPdf);
   // The editor pane sits on a light (not gray) background.
   const editorPixel = await pixelInBox(".cm-scroller", 0.5, 0.95);
   check(

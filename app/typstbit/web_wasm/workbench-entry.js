@@ -1,4 +1,4 @@
-import { EditorState } from "@codemirror/state";
+import { EditorState, EditorSelection } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, crosshairCursor } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { openSearchPanel, searchKeymap, highlightSelectionMatches } from "@codemirror/search";
@@ -6,71 +6,81 @@ import { StreamLanguage, syntaxHighlighting, defaultHighlightStyle, indentOnInpu
 import { autocompletion, closeBrackets, completionKeymap, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { setDiagnostics as cmSetDiagnostics, lintGutter, lintKeymap } from "@codemirror/lint";
 
+function typstToken(stream, state) {
+  if (state.blockDepth > 0) {
+    while (!stream.eol()) {
+      if (stream.match("*/", false)) { stream.next(); stream.next(); state.blockDepth--; }
+      else if (stream.match("/*", false)) { stream.next(); stream.next(); state.blockDepth++; }
+      else stream.next();
+    }
+    return "comment";
+  }
+  if (state.inString) {
+    while (!stream.eol()) {
+      const ch = stream.next();
+      if (ch === "\\") { stream.next(); continue; }
+      if (ch === '"') { state.inString = false; break; }
+    }
+    return "string";
+  }
+  if (state.inRaw) {
+    while (!stream.eol()) { if (stream.next() === "`") { state.inRaw = false; break; } }
+    return "monospace";
+  }
+  if (state.inMath) {
+    while (!stream.eol()) { if (stream.next() === "$") { state.inMath = false; break; } }
+    return "math";
+  }
+  if (state.inStrong) {
+    if (stream.eat("*")) { state.inStrong = false; return "strong"; }
+    if (stream.eatWhile(/[^\s*]+/)) return "strong";
+    state.inStrong = false;
+    return null;
+  }
+  if (state.inEm) {
+    if (stream.eat("_")) { state.inEm = false; return "emphasis"; }
+    if (stream.eatWhile(/[^\s_]+/)) return "emphasis";
+    state.inEm = false;
+    return null;
+  }
+  if (stream.eatSpace()) return null;
+  if (stream.sol()) {
+    if (stream.match(/^={1,6}\s/)) { stream.skipToEnd(); return "heading"; }
+    if (stream.match(/^[-+]\s/)) return "list";
+    if (stream.match(/^\d+\.\s/)) return "list";
+  }
+  if (stream.match("//", false)) { stream.skipToEnd(); return "comment"; }
+  if (stream.match("/*")) { state.blockDepth = 1; return "comment"; }
+  if (stream.match(/<[^>\s]+>/)) return "label";
+  if (stream.match(/@[A-Za-z][\w.-]*/)) return "link";
+  if (stream.eat("#")) { stream.eatWhile(/[\w.-]/); return "keyword"; }
+  if (stream.eat("$")) { state.inMath = true; return "math"; }
+  if (stream.eat('"')) { state.inString = true; return "string"; }
+  if (stream.eat("`")) { state.inRaw = true; return "monospace"; }
+  if (stream.eat("*")) { state.inStrong = true; return "strong"; }
+  if (stream.eat("_")) { state.inEm = true; return "emphasis"; }
+  if (stream.eatWhile(/[A-Za-z_][\w.-]*/)) {
+    const word = stream.current();
+    if (/^(let|set|show|rule|import|include|context|if|else|for|while|return|none|auto|true|false)$/.test(word)) return "keyword";
+    return null;
+  }
+  if (stream.match(/\d+(\.\d+)?(pt|em|fr|%)?/)) return "number";
+  stream.next();
+  return null;
+}
+
 const typstStream = StreamLanguage.define({
   name: "typst",
   startState() {
     return { blockDepth: 0, inString: false, inMath: false, inStrong: false, inEm: false, inRaw: false };
   },
   token(stream, state) {
-    if (state.blockDepth > 0) {
-      while (!stream.eol()) {
-        if (stream.match("*/", false)) { stream.next(); stream.next(); state.blockDepth--; }
-        else if (stream.match("/*", false)) { stream.next(); stream.next(); state.blockDepth++; }
-        else stream.next();
-      }
-      return "comment";
-    }
-    if (state.inString) {
-      while (!stream.eol()) {
-        const ch = stream.next();
-        if (ch === "\\") { stream.next(); continue; }
-        if (ch === '"') { state.inString = false; break; }
-      }
-      return "string";
-    }
-    if (state.inRaw) {
-      while (!stream.eol()) { if (stream.next() === "`") { state.inRaw = false; break; } }
-      return "monospace";
-    }
-    if (state.inMath) {
-      while (!stream.eol()) { if (stream.next() === "$") { state.inMath = false; break; } }
-      return "math";
-    }
-    if (state.inStrong) {
-      if (stream.eat("*")) { state.inStrong = false; return "strong"; }
-      stream.eatWhile(/[^\s*]+/);
-      return "strong";
-    }
-    if (state.inEm) {
-      if (stream.eat("_")) { state.inEm = false; return "emphasis"; }
-      stream.eatWhile(/[^\s_]+/);
-      return "emphasis";
-    }
-    if (stream.eatSpace()) return null;
-    if (stream.pos === 0 || stream.sol()) {
-      const rest = stream.match(/^={1,6}\s.*$/, false);
-      if (rest) { stream.skipToEnd(); return "heading"; }
-      if (stream.match(/^[-+]\s/)) return "list";
-      if (stream.match(/^\d+\.\s/)) return "list";
-    }
-    if (stream.match("//", false)) { stream.skipToEnd(); return "comment"; }
-    if (stream.match("/*")) { state.blockDepth = 1; return "comment"; }
-    if (stream.match(/<[^>\s]+>/)) return "label";
-    if (stream.match(/@[A-Za-z][\w.-]*/)) return "link";
-    if (stream.eat("#")) { stream.eatWhile(/[\w.-]/); return "keyword"; }
-    if (stream.eat("$")) { state.inMath = true; return "math"; }
-    if (stream.eat('"')) { state.inString = true; return "string"; }
-    if (stream.eat("`")) { state.inRaw = true; return "monospace"; }
-    if (stream.eat("*")) { state.inStrong = true; return "strong"; }
-    if (stream.eat("_")) { state.inEm = true; return "emphasis"; }
-    if (stream.eatWhile(/[A-Za-z_][\w.-]*/)) {
-      const word = stream.current();
-      if (/^(let|set|show|rule|import|include|include|context|if|else|for|while|return|none|auto|true|false)$/.test(word)) return "keyword";
-      return null;
-    }
-    if (stream.match(/\d+(\.\d+)?(pt|em|fr|%)?/)) return "number";
-    stream.next();
-    return null;
+    const start = stream.pos;
+    const style = typstToken(stream, state);
+    // A token function that returns a style without consuming input makes
+    // CodeMirror abort the view update and freeze the editor.
+    if (style && stream.pos === start) return null;
+    return style;
   },
 });
 
@@ -89,7 +99,7 @@ const editorTheme = EditorView.baseTheme({
   ".tok-number": { color: "#b45309" },
 });
 
-export function createEditor(parent, { doc = "", onChange = () => {}, onRun = () => {} } = {}) {
+export function createEditor(parent, { doc = "", onChange = () => {}, onRun = () => {}, onCommand = () => {}, onSelectionChange = () => {} } = {}) {
   const state = EditorState.create({
     doc,
     extensions: [
@@ -106,8 +116,12 @@ export function createEditor(parent, { doc = "", onChange = () => {}, onRun = ()
       lintGutter(),
       keymap.of([
         { key: "Mod-Enter", run: () => { onRun(); return true; } },
+        { key: "Mod-b", run: () => { onCommand("bold"); return true; } },
+        { key: "Mod-i", run: () => { onCommand("italic"); return true; } },
+        { key: "Mod-u", run: () => { onCommand("underline"); return true; } },
         ...closeBracketsKeymap,
         ...defaultKeymap,
+        ...historyKeymap,
         ...searchKeymap,
         ...completionKeymap,
         ...lintKeymap,
@@ -115,6 +129,7 @@ export function createEditor(parent, { doc = "", onChange = () => {}, onRun = ()
       ]),
       EditorView.updateListener.of(update => {
         if (update.docChanged) onChange(update.state.doc.toString());
+        if (update.docChanged || update.selectionSet) onSelectionChange(update.state.selection.main);
       }),
     ],
   });
@@ -127,7 +142,7 @@ export function createEditor(parent, { doc = "", onChange = () => {}, onRun = ()
       if (!text && before === after && after === "") return { range };
       const insert = text ? before + text + after : before + after;
       const from = range.from + before.length;
-      return { changes: { from: range.from, to: range.to, insert }, range: { from, to: from + (text ? text.length : 0) } };
+      return { changes: { from: range.from, to: range.to, insert }, range: EditorSelection.range(from, from + (text ? text.length : 0)) };
     });
     view.dispatch(changes, { userEvent: "input.typst" });
     view.focus();
@@ -157,6 +172,23 @@ export function createEditor(parent, { doc = "", onChange = () => {}, onRun = ()
     view.focus();
   }
 
+  function clearMarks() {
+    const { state } = view;
+    const lineStart = state.doc.lineAt(state.selection.main.from).number;
+    const lineEnd = state.doc.lineAt(state.selection.main.to).number;
+    const changes = [];
+    for (let n = lineStart; n <= lineEnd; n++) {
+      const line = state.doc.line(n);
+      const stripped = line.text
+        .replace(/^={1,6}\s+/, "")
+        .replace(/^([-+]|\d+\.)\s+/, "")
+        .replace(/[*_`]/g, "");
+      if (stripped !== line.text) changes.push({ from: line.from, to: line.to, insert: stripped });
+    }
+    if (changes.length) view.dispatch({ changes, userEvent: "input.typst" });
+    view.focus();
+  }
+
   function setDiagnostics(list) {
     const { state } = view;
     const total = state.doc.lines;
@@ -179,10 +211,12 @@ export function createEditor(parent, { doc = "", onChange = () => {}, onRun = ()
     wrapSelection,
     prefixLines,
     insertBlock,
+    clearMarks,
     setDiagnostics,
     openSearch: () => openSearchPanel(view),
     focus: () => view.focus(),
     getDoc: () => view.state.doc.toString(),
+    getSelection: () => ({ from: view.state.selection.main.from, to: view.state.selection.main.to }),
     setDoc: text => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, userEvent: "setValue" }),
   };
 }

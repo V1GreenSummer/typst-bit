@@ -231,16 +231,29 @@ console.log("[budget] memory 100 edits:", JSON.stringify(measurements.memory));
 const sizes = (() => {
   const br = (buf) =>
     brotliCompressSync(buf, { params: { [zc.BROTLI_PARAM_QUALITY]: 11 } }).length;
-  const abiRaw = readFileSync(
-    join(ROOT, "rust/target/wasm32-unknown-unknown/release/typst_abi.wasm"),
-  );
-  return {
-    abiRaw: abiRaw.length,
-    abiBrotli: br(abiRaw),
+  const readSize = (path) => {
+    const buf = readFileSync(path);
+    return { raw: buf.length, brotli: br(buf) };
   };
+  const served = readSize(join(ROOT, "rust/target/wasm32-unknown-unknown/release/typst_abi.wasm"));
+  let abi = served;
+  try {
+    abi = readSize(join(ROOT, "rust/target/wasm32-unknown-unknown/release/typst_abi.opt.wasm"));
+  } catch {}
+  const app = readSize(join(ROOT, "app/typstbit/_build/wasm-gc/release/build/web_wasm/web_wasm.wasm"));
+  return { served, abi, app, firstLoad: abi.brotli + app.brotli };
 })();
 console.log(
-  `[budget] typst_abi.wasm: raw=${(sizes.abiRaw / 1048576).toFixed(2)}MiB brotli=${(sizes.abiBrotli / 1048576).toFixed(2)}MiB (pre-wasm-opt)`,
+  `[budget] typst_abi.wasm served: raw=${(sizes.served.raw / 1048576).toFixed(2)}MiB brotli=${(sizes.served.brotli / 1048576).toFixed(2)}MiB (pre-wasm-opt)`,
+);
+console.log(
+  `[budget] typst_abi.wasm shipped: raw=${(sizes.abi.raw / 1048576).toFixed(2)}MiB brotli=${(sizes.abi.brotli / 1048576).toFixed(2)}MiB (wasm-opt -Oz)`,
+);
+console.log(
+  `[budget] app.wasm: raw=${(sizes.app.raw / 1048576).toFixed(2)}MiB brotli=${(sizes.app.brotli / 1048576).toFixed(2)}MiB`,
+);
+console.log(
+  `[budget] 首载总传输（brotli）: ${(sizes.firstLoad / 1048576).toFixed(2)}MiB`,
 );
 
 await browser.close();
@@ -253,6 +266,21 @@ check("10 页编译 P95 ≤ 3s", num(measurements.tenCompile) <= 3000 && measure
 check("单页 1x 渲染 P95 ≤ 200ms", num(measurements.render) <= 200 && measurements.renderAllOk);
 check("100 次编辑内存增长 ≤ 20%", parseFloat(measurements.memory.growthPct) <= 20, measurements.memory.growthPct + "%");
 check("初始化（到可编辑）≤ 5s", initMs <= 5000, `${initMs}ms（桌面级，中端折算待 9.1 矩阵）`);
+check(
+  "typst_abi raw ≤ 39MiB（wasm-opt 后）",
+  sizes.abi.raw <= 39 * 1048576,
+  `${(sizes.abi.raw / 1048576).toFixed(2)}MiB`,
+);
+check(
+  "typst_abi brotli ≤ 14MiB（wasm-opt 后）",
+  sizes.abi.brotli <= 14 * 1048576,
+  `${(sizes.abi.brotli / 1048576).toFixed(2)}MiB`,
+);
+check(
+  "首载总传输 ≤ 14.5MiB",
+  sizes.firstLoad <= 14.5 * 1048576,
+  `${(sizes.firstLoad / 1048576).toFixed(2)}MiB`,
+);
 
 console.log(failures.length === 0 ? "ACCEPTANCE: PASS" : `ACCEPTANCE: FAIL (${failures.join(", ")})`);
 process.exit(failures.length === 0 ? 0 : 1);

@@ -51,9 +51,8 @@ button:hover { background: #e7eaf0; }
 .cm-activeLineGutter { background: #e8efff; color: var(--accent); }
 .preview-tools { margin-left: auto; display: flex; align-items: center; gap: 3px; }
 .zoom { min-width: 45px; text-align: center; color: var(--muted); font-size: 11px; }
-.preview-canvas { min-height: 0; flex: 1; overflow: auto; padding: 26px; background: #e7e9ed; display: flex; justify-content: center; align-items: flex-start; }
-.paper { background: white; box-shadow: 0 2px 12px #1d27331f; transform-origin: top center; transition: transform .15s ease; }
-.paper img { display: block; max-width: none; }
+.pdf-frame { min-height: 0; flex: 1; background: #e7e9ed; display: flex; }
+.pdf-frame embed { flex: 1; width: 100%; height: 100%; border: 0; }
 .empty-preview { margin: 80px auto; text-align: center; color: var(--muted); font-size: 13px; }
 .diagnostics { height: 104px; flex: 0 0 104px; border-top: 1px solid var(--line); background: white; overflow: auto; }
 .diagnostics-head { height: 32px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; }
@@ -65,3 +64,13 @@ button:hover { background: #e7eaf0; }
 .statusbar .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .toast { position: fixed; right: 18px; bottom: 42px; padding: 9px 12px; background: #242933; color: white; border-radius: 4px; font-size: 12px; box-shadow: 0 5px 20px #0003; }
 @media (max-width: 980px) { .workspace-grid { grid-template-columns: 170px minmax(360px, 1fr) minmax(300px, 1fr); } .workspace { display: none; } }
+
+.formatbar button.active { background: #e0e7ff; color: #1e3a8a; }
+.command-palette { position: fixed; z-index: 60; top: 12vh; left: 50%; transform: translateX(-50%); width: 520px; max-width: 90vw; background: white; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 18px 48px #1d273340; display: none; overflow: hidden; }
+.command-palette.open { display: block; }
+.command-input { width: 100%; border: 0; border-bottom: 1px solid var(--line); padding: 12px 14px; font: inherit; outline: none; }
+.command-list { max-height: 320px; overflow: auto; padding: 6px; }
+.command-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.command-item.selected { background: #eef2ff; }
+.command-item .category { color: var(--muted); font-size: 12px; }
+.command-item .shortcut { margin-left: auto; color: #9ca3af; font-size: 12px; }

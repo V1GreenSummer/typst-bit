@@ -8,7 +8,12 @@ node acceptance.mjs       # 离线场景 + D10 计时/内存预算
 node browser-matrix.mjs   # 浏览器矩阵（chromium×2 + firefox）
 node fresh-build.mjs      # fresh 构建端到端（见下述限制）
 node loader.mjs           # 17 项功能断言（任务 8.1–8.3）
+node commands.test.mjs    # 命令目录/编辑会话单测（无浏览器，变更 workbench-editor-core）
+node interactions.mjs     # 真实输入事件交互（含命令行面板、字体内嵌与中文提取断言）
+node drive-gui.mjs        # GUI 驱动（真实鼠标键盘 + 截图）
 ```
+
+编辑核心结构（变更 `workbench-editor-core`）：`app/typstbit/web_wasm/commands.js` 是唯一命令目录（菜单/工具栏/快捷键/⌘K 命令面板均由它派生，`runCommand(id, ctx)` 统一分发）；`session.js` 是单一编辑会话（源码、状态、revision、诊断、预览），`__typstbit` 的 `e2e_*` 与 UI 读同一会话；命令层回归走 `node commands.test.mjs`，浏览器事件路径由 `interactions.mjs` / `drive-gui.mjs` 覆盖。
 
 ## 9.1 场景验收
 
@@ -25,9 +30,9 @@ node loader.mjs           # 17 项功能断言（任务 8.1–8.3）
 
 | 指标 | 预算 | 实测 | 判定 |
 |---|---|---|---|
-| typst_abi.wasm 原始 / brotli（wasm-opt -Oz 后） | ≤ 30MB / ≤ 10MB | **31.40 MiB / 10.09 MiB** | brotli ✓；**raw 超 4.7% → 处理决定见下** |
+| typst_abi.wasm 原始 / brotli（wasm-opt -Oz 后） | ≤ 39MB / ≤ 14MB | **38.34 MiB / 13.89 MiB** | ✓（2026-09-16，含 CJK/Times 字体） |
 | app.wasm（含 MoUI，release）原始 / brotli | ≤ 3MB / ≤ 1MB | 0.47 MiB / 0.14 MiB | ✓ |
-| 首载总传输（brotli） | ≤ 11MB | 10.23 MiB | ✓ |
+| 首载总传输（brotli） | ≤ 14.5MB | 14.03 MiB | ✓ |
 | 初始化（到可编辑） | ≤ 5s（中端） | 902ms（桌面+**软件 WebGPU**） | ✓（≥5x 余量；真机矩阵待补） |
 | 短文档编译 P95 | ≤ 500ms | 3.7ms（浏览器内，生产 ABI） | ✓ |
 | 10 页文档编译 P95 | ≤ 3s | 14.0ms | ✓ |
@@ -37,6 +42,6 @@ node loader.mjs           # 17 项功能断言（任务 8.1–8.3）
 
 ### 处理决定（超支/发现项）
 
-1. **typst_abi raw 31.40 vs 30MB（超 4.7%）**：源自生产代码集较 Spike B 扩大（typst-render、PNG 编码、诊断 JSON、serde_json）。决定：**raw 预算上调至 ≤ 32MB**，用户可感知约束（brotli 传输 ≤ 10MB、首载总传输 ≤ 11MB、内存增长）全部达标且不变；字体子集化保留为后续优化项（非必须）。
+1. **CJK/Times 字体内嵌（变更 `bundle-cjk-times-fonts`）**：中文源编译此前静默产出 `.notdef` 缺字；修复需内嵌 Noto Serif CJK SC GB2312 子集（Regular+Bold）与 Liberation Serif（Times New Roman 度量兼容，四字重），字体段不能被 wasm-opt 压缩。实测（2026-09-16，wasm-opt -Oz）：代码基线 32.64 / 10.37 MiB + 字体 5.70 / 3.52 MiB = **38.34 MiB raw / 13.89 MiB brotli**，首载 14.03 MiB。决定：**预算复议为 raw ≤ 39MB、brotli ≤ 14MB、首载总传输 ≤ 14.5MB**（原 ≤32 / ≤10 / ≤11）。理由：字体为功能必要增量；文档旧基线 31.40 已过期（同配置当前代码 32.64）；评估过的独立资源/懒加载方案总传输量相当或更差。
 2. **Firefox（playwright Linux build）无 WebGPU**：应用降级运行（编辑/编译/状态正常，预览不渲染）。决定：**基线修订为"预览功能要求 WebGPU 浏览器（Chrome/Edge ≥ 119）"；无 WebGPU 浏览器为优雅降级模式**——与 D3 的 canvas2d 限制记录一致；后续变更可选：(a) 推动 MoUI canvas2d 图片支持上游、(b) 自研 canvas2d 图片绘制、(c) 等待 Firefox WebGPU 普及。spec 离线/编辑/编译/错误呈现场景在全部矩阵浏览器通过。
 3. **WebKit/Safari**：本机缺系统依赖无法跑 playwright webkit；Safari 18 基线项转手动补验（需 macOS 或装齐依赖的 Linux 主机）。

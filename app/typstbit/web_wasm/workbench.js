@@ -1,8 +1,16 @@
-const DEFAULT_SOURCE = "#set page(width: 20cm, height: 10cm)\n= Hello, Typst!\n\n#lorem(60)";
-const DEBOUNCE_MS = 300;
-const SCALE_MIN = 600, SCALE_MAX = 3000;
+import { createSession, STATUS } from "./session.js";
+import {
+  MENUS,
+  FORMAT_BUTTONS,
+  TOPBAR_ACTIONS,
+  filterCommands,
+  commandActive,
+  getCommand,
+  runCommand as dispatchCommand,
+} from "./commands.js";
 
-const STATUS = { IDLE: 0, COMPILING: 1, SUCCESS: 2, FAILED: 3 };
+const DEFAULT_SOURCE = "#set text(font: (\"Liberation Serif\", \"Noto Serif CJK SC\"))\n#set page(width: 20cm, height: 10cm)\n= Hello, Typst!\n\n#lorem(60)";
+const DEBOUNCE_MS = 300;
 
 function decodeShare() {
   const hash = location.hash;
@@ -49,6 +57,11 @@ class Abi {
     if (ptr === 0) return null;
     return this.outLen(ptr);
   }
+  pdf() {
+    const ptr = this.ex.typst_abi_export_pdf();
+    if (ptr === 0) return null;
+    return this.outLen(ptr);
+  }
   errorJson() {
     const ptr = this.ex.typst_abi_error_json();
     if (ptr === 0) return { diagnostics: [] };
@@ -70,6 +83,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     typstTexts: new Map(), nextTextId: 1, app: null,
   };
   globalThis.__typstbit = compat;
+  let ctx = null;
 
   const response = await fetch(abiWasmUrl);
   if (!response.ok) throw new Error(`fetch typst_abi failed: ${response.status}`);
@@ -92,8 +106,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   host.appendChild(app);
 
   const statusPill = el("span", "status-pill", "待编译");
-  const pageLabel = el("span", "", "第 1 / 0 页");
-  const zoomLabel = el("span", "zoom", "100%");
+  const pageLabel = el("span", "", "共 0 页");
   const statusDetail = el("span", "", "编辑源码后将自动编译");
   const errCount = el("span", "count error", "✕ 0 错误");
   const warnCount = el("span", "count warning", "⚠ 0 警告");
@@ -105,49 +118,29 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     el("span", "workspace", "WORKSPACE / MAIN.TYP"),
     el("span", "grow"),
     statusPill,
-    Object.assign(el("button", "button"), { textContent: "分享", onclick: shareDoc }),
-    Object.assign(el("button", "button"), { textContent: "导出 PNG", onclick: exportPng }),
-    Object.assign(el("button", "button primary"), { textContent: "立即编译", onclick: () => compileNow() }),
+    ...TOPBAR_ACTIONS.map(action =>
+      Object.assign(el("button", action.variant ? `button ${action.variant}` : "button"), {
+        textContent: action.label,
+        onclick: () => runCommand(action.id),
+      })),
   );
 
   const menubar = el("div", "menubar");
   menubar.append(
-    menuButton("File", [
-      ["恢复示例", resetExample],
-      ["导出当前页 PNG", exportPng],
-      ["复制分享链接", shareDoc],
-    ]),
-    menuButton("Edit", [
-      ["查找替换 ⌘F", () => editor.openSearch()],
-      ["撤销 ⌘Z", () => undo(1)],
-      ["重做 ⇧⌘Z", () => undo(-1)],
-    ]),
-    menuButton("View", [
-      ["放大预览", () => stepScale(200)],
-      ["缩小预览", () => stepScale(-200)],
-      ["重置缩放", () => setScale(1500)],
-    ]),
-    menuButton("Help", [
-      ["快捷键", () => toast("⌘Enter 编译 · ⌘F 搜索 · 括号/引号自动闭合 · Tab 缩进")],
-    ]),
+    ...MENUS.map(menu => menuButton(menu.label, menu.items)),
     el("span", "grow"),
     el("span", "", "⌘K 搜索命令"),
   );
 
   const formatbar = el("div", "formatbar");
-  formatbar.append(
-    formatBtn("正文", () => editor.prefixLines("")),
-    formatBtn("B", () => editor.wrapSelection("*")),
-    formatBtn("I", () => editor.wrapSelection("_")),
-    formatBtn("下划线", () => toast("使用 #text(fill: blue)[选中文字] 设置颜色")),
-    formatBtn("标题", () => editor.prefixLines("= ")),
-    formatBtn("列表", () => editor.prefixLines("- ")),
-    formatBtn("数学", () => editor.insertBlock("$ x + y = z $")),
-    formatBtn("代码块", () => editor.insertBlock("```typ\n\n```")),
-    formatBtn("引用", () => editor.insertBlock("@label")),
-    el("span", "grow"),
-    formatBtn("⌕ 搜索", () => editor.openSearch()),
-  );
+  const formatButtons = new Map();
+  for (const item of FORMAT_BUTTONS) {
+    if (item.id === "open-search") formatbar.append(el("span", "grow"));
+    const button = el("button", "", item.label);
+    button.onclick = () => runCommand(item.id);
+    formatButtons.set(item.id, button);
+    formatbar.append(button);
+  }
 
   const sidebar = el("div", "sidebar");
   sidebar.append(
@@ -157,7 +150,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     (() => {
       const tools = el("div", "sidebar-tools");
       const search = el("button", "", "⌕ 搜索");
-      search.onclick = () => editor.openSearch();
+      search.onclick = () => runCommand("open-search");
       const outline = el("button", "", "☷ 文档大纲");
       outline.onclick = showOutline;
       tools.append(search, outline);
@@ -179,28 +172,20 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   );
 
   const previewPane = el("div", "preview-pane");
-  const paper = el("div", "paper");
-  const previewImg = el("img", "");
-  previewImg.style.display = "none";
-  const emptyPreview = el("div", "empty-preview", "编译后将在这里显示页面");
-  paper.append(previewImg, emptyPreview);
-  const canvas = el("div", "preview-canvas", "");
-  canvas.append(paper);
+  const pdfEmbed = el("embed", "pdf-view");
+  pdfEmbed.type = "application/pdf";
+  pdfEmbed.style.display = "none";
+  const emptyPreview = el("div", "empty-preview", "编译后将在这里显示 PDF");
+  const pdfFrame = el("div", "pdf-frame");
+  pdfFrame.append(pdfEmbed, emptyPreview);
   const previewHead = el("div", "pane-head");
   previewHead.append(
-    el("span", "", "预览"),
+    el("span", "", "预览（PDF）"),
     el("span", "grow"),
-    (() => {
-      const tools = el("div", "preview-tools");
-      tools.append(
-        Object.assign(el("button", "button"), { textContent: "−", onclick: () => stepScale(-200) }),
-        zoomLabel,
-        Object.assign(el("button", "button"), { textContent: "+", onclick: () => stepScale(200) }),
-      );
-      return tools;
-    })(),
+    el("button", "button", "在新标签页打开"),
   );
-  previewPane.append(previewHead, canvas);
+  previewHead.lastChild.onclick = () => openPdfTab();
+  previewPane.append(previewHead, pdfFrame);
 
   const grid = el("div", "workspace-grid");
   grid.append(sidebar, editorPane, previewPane);
@@ -217,26 +202,18 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     el("span", "grow"),
     (() => {
       const right = el("span", "right");
-      right.append(
-        Object.assign(el("button", "button"), { textContent: "‹ 上一页", onclick: () => turnPage(-1) }),
-        pageLabel,
-        Object.assign(el("button", "button"), { textContent: "下一页 ›", onclick: () => turnPage(1) }),
-      );
+      right.append(pageLabel, el("span", "", "PDF 预览支持浏览器内缩放与翻页"));
       return right;
     })(),
   );
 
   app.append(topbar, menubar, formatbar, grid, statusbar);
 
-  const state = {
-    status: STATUS.IDLE, revision: 0, docRevision: null,
-    pageCount: 0, page: 0, scale: 1500,
-    diagnostics: [], previewUrl: null, previewReady: false,
-    previewFailed: false, blobUrls: [], pendingTimer: null,
-    compilingCount: 0,
-  };
+  const session = createSession({ scale: 1500 });
+  const state = session.state;
 
   compat.blobUrls = state.blobUrls;
+  compat.session = session;
   compat.abi = abi;
   compat.revokedUrls = [];
   compat.urlRevision = new Map();
@@ -250,19 +227,105 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       localStorage.setItem("typstbit.source", text);
       scheduleCompile(text);
     },
-    onRun: () => compileNow(),
+    onRun: () => runCommand("compile-now"),
+    onCommand: id => runCommand(id),
+    onSelectionChange: () => refreshCommandStates(),
   });
+
+  ctx = {
+    editor,
+    session,
+    ui: { toast, openPalette: () => openPalette() },
+    actions: {
+      resetExample,
+      exportPdf,
+      shareDoc,
+      openPdfTab,
+      compileNow,
+      undo: () => undo(1),
+      redo: () => undo(-1),
+    },
+  };
+
+  const palette = el("div", "command-palette");
+  const paletteInput = el("input", "command-input");
+  paletteInput.placeholder = "输入命令名称…";
+  const paletteList = el("div", "command-list");
+  palette.append(paletteInput, paletteList);
+  document.body.appendChild(palette);
+  let paletteItems = [];
+  let paletteIndex = 0;
+
+  function runCommand(id) {
+    if (!ctx) return false;
+    const executed = dispatchCommand(id, ctx);
+    refreshCommandStates();
+    return executed;
+  }
+
+  function refreshCommandStates() {
+    if (!ctx) return;
+    for (const [id, button] of formatButtons) {
+      button.classList.toggle("active", commandActive(id, ctx));
+    }
+  }
+
+  function renderPalette(query) {
+    paletteItems = filterCommands(query);
+    paletteIndex = 0;
+    paletteList.innerHTML = "";
+    paletteItems.forEach((command, index) => {
+      const row = el("div", index === 0 ? "command-item selected" : "command-item");
+      row.append(el("span", "", command.label), el("span", "category", command.category));
+      if (command.shortcut) row.append(el("span", "shortcut", command.shortcut));
+      row.onclick = () => executePalette(index);
+      paletteList.append(row);
+    });
+  }
+
+  function selectPalette(index) {
+    if (paletteItems.length === 0) return;
+    paletteIndex = Math.max(0, Math.min(index, paletteItems.length - 1));
+    [...paletteList.children].forEach((row, i) => row.classList.toggle("selected", i === paletteIndex));
+  }
+
+  function executePalette(index = paletteIndex) {
+    const command = paletteItems[index];
+    closePalette();
+    if (command) runCommand(command.id);
+  }
+
+  function openPalette() {
+    palette.classList.add("open");
+    paletteInput.value = "";
+    renderPalette("");
+    paletteInput.focus();
+  }
+
+  function closePalette() {
+    palette.classList.remove("open");
+    editor.focus();
+  }
+
+  paletteInput.oninput = () => renderPalette(paletteInput.value);
+  paletteInput.onkeydown = event => {
+    if (event.key === "ArrowDown") { event.preventDefault(); selectPalette(paletteIndex + 1); }
+    else if (event.key === "ArrowUp") { event.preventDefault(); selectPalette(paletteIndex - 1); }
+    else if (event.key === "Enter") { event.preventDefault(); executePalette(); }
+    else if (event.key === "Escape") { event.preventDefault(); closePalette(); }
+  };
+  window.addEventListener("keydown", event => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      if (palette.classList.contains("open")) closePalette();
+      else openPalette();
+    }
+  }, true);
 
   function toast(message) {
     const node = el("div", "toast", message);
     document.body.appendChild(node);
     setTimeout(() => node.remove(), 2600);
-  }
-
-  function formatBtn(label, fn) {
-    const b = el("button", "", label);
-    b.onclick = fn;
-    return b;
   }
 
   function menuButton(label, items) {
@@ -275,13 +338,14 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       background: "white", border: "1px solid var(--line)", borderRadius: "6px",
       boxShadow: "0 8px 24px #1d273326", padding: "4px", display: "none", minWidth: "180px",
     });
-    for (const [text, fn] of items) {
-      const item = el("button", "button", text);
-      item.style.display = "block";
-      item.style.width = "100%";
-      item.style.textAlign = "left";
-      item.onclick = () => { menu.style.display = "none"; fn(); };
-      menu.append(item);
+    for (const item of items) {
+      const command = getCommand(item.id);
+      const node = el("button", "button", item.label ?? command?.label ?? item.id);
+      node.style.display = "block";
+      node.style.width = "100%";
+      node.style.textAlign = "left";
+      node.onclick = () => { menu.style.display = "none"; runCommand(item.id); };
+      menu.append(node);
     }
     btn.onclick = e => {
       e.stopPropagation();
@@ -298,12 +362,11 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     statusDetail.textContent =
       state.status === STATUS.IDLE ? "编辑源码后将自动编译" :
       state.status === STATUS.COMPILING ? "正在生成最新排版结果" :
-      state.status === STATUS.SUCCESS ? `已生成 ${state.pageCount} 页 · 预览为最新结果` :
+      state.status === STATUS.SUCCESS ? `已生成 ${state.pageCount} 页 PDF · 预览为最新结果` :
       `发现 ${state.diagnostics.filter(d => d.severity === "error").length} 个错误 · 已保留上次预览`;
     errCount.textContent = `✕ ${state.diagnostics.filter(d => d.severity === "error").length} 错误`;
     warnCount.textContent = `⚠ ${state.diagnostics.filter(d => d.severity === "warning").length} 警告`;
-    pageLabel.textContent = `第 ${state.pageCount > 0 ? state.page + 1 : 0} / ${state.pageCount} 页`;
-    zoomLabel.textContent = `${Math.round(state.scale / 15)}%`;
+    pageLabel.textContent = `共 ${state.pageCount} 页`;
     renderDiagList();
   }
 
@@ -385,7 +448,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
         state.page = 0;
         state.previewReady = false;
         state.previewFailed = false;
-        requestPage(revision, 0);
+        requestPdf(revision);
       } else if (status === 3) {
         state.status = STATUS.FAILED;
       } else {
@@ -397,14 +460,14 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     }));
   }
 
-  function requestPage(revision, page) {
-    const png = bridge.renderPagePng(page, state.scale);
-    if (!png || revision !== state.docRevision) {
-      if (revision === state.docRevision) { state.previewFailed = true; }
-      updatePreviewImg();
+  function requestPdf(revision) {
+    const bytes = bridge.pdf();
+    if (!bytes || revision !== state.docRevision) {
+      if (revision === state.docRevision) state.previewFailed = true;
+      updatePreviewView();
       return;
     }
-    const url = URL.createObjectURL(new Blob([png], { type: "image/png" }));
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
     state.blobUrls.push(url);
     compat.urlRevision.set(url, revision);
     if (state.previewUrl) {
@@ -413,38 +476,35 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     }
     state.previewUrl = url;
     state.previewReady = false;
-    previewImg.onload = () => { state.previewReady = true; compat.urlSettled.set(url, true); setStatusUI(); };
-    previewImg.onerror = () => { state.previewFailed = true; state.previewReady = false; setStatusUI(); };
-    updatePreviewImg();
+    pdfEmbed.onload = () => { state.previewReady = true; compat.urlSettled.set(url, true); setStatusUI(); };
+    pdfEmbed.onerror = () => { state.previewFailed = true; state.previewReady = false; setStatusUI(); };
+    setTimeout(() => {
+      if (state.previewUrl === url && !state.previewReady) {
+        state.previewReady = true;
+        compat.urlSettled.set(url, true);
+        setStatusUI();
+      }
+    }, 1500);
+    updatePreviewView();
     setStatusUI();
   }
 
-  function updatePreviewImg() {
+  function updatePreviewView() {
     if (state.previewUrl) {
-      previewImg.src = state.previewUrl;
-      previewImg.style.display = "block";
+      pdfEmbed.src = state.previewUrl;
+      pdfEmbed.style.display = "block";
       emptyPreview.style.display = "none";
     } else {
-      previewImg.style.display = "none";
+      pdfEmbed.removeAttribute("src");
+      pdfEmbed.style.display = "none";
       emptyPreview.style.display = "block";
-      emptyPreview.textContent = state.previewFailed ? "预览生成失败" : state.status === STATUS.COMPILING ? "正在排版…" : "编译后将在这里显示页面";
+      emptyPreview.textContent = state.previewFailed ? "PDF 生成失败" : state.status === STATUS.COMPILING ? "正在排版…" : "编译后将在这里显示 PDF";
     }
   }
 
-  function setScale(value) {
-    state.scale = Math.min(SCALE_MAX, Math.max(SCALE_MIN, value));
-    if (state.docRevision !== null) requestPage(state.docRevision, state.page);
-    setStatusUI();
-  }
-  function stepScale(delta) { setScale(state.scale + delta); }
-
-  function turnPage(delta) {
-    const next = Math.min(Math.max(0, state.page + delta), Math.max(0, state.pageCount - 1));
-    if (next === state.page || state.docRevision === null) return;
-    state.page = next;
-    state.previewReady = false;
-    requestPage(state.docRevision, next);
-    setStatusUI();
+  function openPdfTab() {
+    if (!state.previewUrl) { toast("还没有可打开的 PDF，请先编译"); return; }
+    window.open(state.previewUrl, "_blank");
   }
 
   function resetExample() {
@@ -463,11 +523,11 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     toast(heads.length ? "大纲: " + heads.join(" · ") : "文档没有标题");
   }
 
-  function exportPng() {
-    if (!state.previewUrl) { toast("还没有可导出的页面，请先编译"); return; }
+  function exportPdf() {
+    if (!state.previewUrl) { toast("还没有可导出的 PDF，请先编译"); return; }
     const a = el("a");
     a.href = state.previewUrl;
-    a.download = `typstbit-page${state.page + 1}.png`;
+    a.download = "typstbit.pdf";
     a.click();
   }
 
@@ -482,7 +542,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       e2e_status: () => state.status,
       e2e_revision: () => state.revision,
       e2e_page_count: () => state.pageCount,
-      e2e_current_page: () => state.page,
+      e2e_current_page: () => 0,
       e2e_preview_ready: () => (state.previewReady ? 1 : 0),
       e2e_error_count: () => state.diagnostics.filter(d => d.severity === "error").length,
       e2e_compiling_count: () => state.compilingCount,
@@ -490,7 +550,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
         if (rev !== state.docRevision) return;
         if (stt === 0) state.previewReady = true;
         else { state.previewFailed = true; state.previewReady = false; }
-        updatePreviewImg();
+        updatePreviewView();
       },
       e2e_set_source: textId => {
         const text = compat.typstTexts.get(Number(textId));
@@ -500,7 +560,9 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
         const needle = compat.typstTexts.get(Number(textId));
         return typeof needle === "string" && editor.getDoc().includes(needle) ? 1 : 0;
       },
-      e2e_turn_page: dir => turnPage(dir === 0 ? -1 : 1),
+      e2e_turn_page: () => {},
+      e2e_doc: () => editor.getDoc(),
+      e2e_cursor_line: () => editor.view.state.doc.lineAt(editor.view.state.selection.main.head).number,
     },
   };
   compat.ready = true;

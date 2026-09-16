@@ -161,6 +161,7 @@ struct State {
     arena: Arena,
     png_out: Vec<u8>,
     json_out: Vec<u8>,
+    pdf_out: Vec<u8>,
 }
 
 impl State {
@@ -172,6 +173,7 @@ impl State {
             arena: Arena::new(),
             png_out: Vec::new(),
             json_out: Vec::new(),
+            pdf_out: Vec::new(),
         }
     }
 }
@@ -392,5 +394,28 @@ pub unsafe extern "C" fn typst_abi_error_json() -> usize {
         st.json_out = json.into_bytes();
         OUT_LEN = len;
         st.json_out.as_ptr() as usize
+    }
+}
+
+/// Export the most recent successful document as a PDF. Returns a pointer
+/// into the PDF output buffer (valid until the next successful
+/// `typst_abi_export_pdf`), or 0 when there is no document or the PDF
+/// encoding fails. Length in `typst_abi_out_len_ptr`.
+#[no_mangle]
+pub unsafe extern "C" fn typst_abi_export_pdf() -> usize {
+    unsafe {
+        let st = state();
+        let Some(document) = st.document.as_ref() else {
+            return 0;
+        };
+        let options = typst_pdf::PdfOptions::default();
+        let bytes = match typst_pdf::pdf(document, &options) {
+            Ok(bytes) => bytes,
+            Err(_) => return 0,
+        };
+        let len = bytes.len() as u32;
+        st.pdf_out = bytes;
+        OUT_LEN = len;
+        st.pdf_out.as_ptr() as usize
     }
 }
