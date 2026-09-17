@@ -74,7 +74,7 @@ check("boot status 就绪", (await status()).includes("就绪"), await status())
 check("boot preview ready", (await previewReady()) === 1);
 check("boot page count >= 1", (await pageCount()) >= 1, `pages=${await pageCount()}`);
 const bootDoc = await page.evaluate(() => document.querySelector(".cm-content")?.textContent ?? "");
-check("boot editor shows default doc", bootDoc.includes("Hello, Typst!"), bootDoc.slice(0, 40));
+check("boot editor shows default doc", bootDoc.includes("The Typst Playground"), bootDoc.slice(0, 60));
 check("boot default template sets bundled fonts", bootDoc.includes('font: ("Liberation Serif", "Noto Serif CJK SC")'), bootDoc.slice(0, 60));
 await shot("boot");
 
