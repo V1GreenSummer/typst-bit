@@ -5,6 +5,7 @@ import {
   TOPBAR_ACTIONS,
   filterCommands,
   commandActive,
+  commandEnabled,
   getCommand,
   runCommand as dispatchCommand,
 } from "./commands.js";
@@ -85,7 +86,12 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   globalThis.__typstbit = compat;
   let ctx = null;
 
-  const response = await fetch(abiWasmUrl);
+  let abiUrl = String(abiWasmUrl);
+  let response = await fetch(abiUrl);
+  if (!response.ok && abiUrl.includes("typst_abi.opt.wasm")) {
+    abiUrl = abiUrl.replace("typst_abi.opt.wasm", "typst_abi.wasm");
+    response = await fetch(abiUrl);
+  }
   if (!response.ok) throw new Error(`fetch typst_abi failed: ${response.status}`);
   let abi;
   try {
@@ -172,19 +178,25 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   );
 
   const previewPane = el("div", "preview-pane");
-  const pdfEmbed = el("embed", "pdf-view");
-  pdfEmbed.type = "application/pdf";
-  pdfEmbed.style.display = "none";
-  const emptyPreview = el("div", "empty-preview", "编译后将在这里显示 PDF");
+  const pageImage = el("img", "pdf-view");
+  pageImage.alt = "预览";
+  pageImage.style.display = "none";
+  const emptyPreview = el("div", "empty-preview", "编译后将在这里显示预览");
   const pdfFrame = el("div", "pdf-frame");
-  pdfFrame.append(pdfEmbed, emptyPreview);
+  pdfFrame.append(pageImage, emptyPreview);
+  const prevButton = el("button", "button", "上一页");
+  const nextButton = el("button", "button", "下一页");
+  const pageIndicator = el("span", "page-indicator", "第 0 / 0 页");
+  prevButton.onclick = () => turnPage(-1);
+  nextButton.onclick = () => turnPage(1);
+  const openTabButton = el("button", "button", "在新标签页打开");
+  openTabButton.onclick = () => openPdfTab();
   const previewHead = el("div", "pane-head");
   previewHead.append(
-    el("span", "", "预览（PDF）"),
+    el("span", "", "预览"),
     el("span", "grow"),
-    el("button", "button", "在新标签页打开"),
+    prevButton, pageIndicator, nextButton, openTabButton,
   );
-  previewHead.lastChild.onclick = () => openPdfTab();
   previewPane.append(previewHead, pdfFrame);
 
   const grid = el("div", "workspace-grid");
@@ -202,7 +214,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     el("span", "grow"),
     (() => {
       const right = el("span", "right");
-      right.append(pageLabel, el("span", "", "PDF 预览支持浏览器内缩放与翻页"));
+      right.append(pageLabel, el("span", "", "预览按页栅格渲染 · PDF 可导出分享"));
       return right;
     })(),
   );
@@ -220,16 +232,24 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   compat.urlSettled = new Map();
   Object.defineProperty(compat, "currentSource", { get: () => state.previewUrl ?? "" });
 
-  const initial = decodeShare() ?? localStorage.getItem("typstbit.source") ?? DEFAULT_SOURCE;
+  const shared = decodeShare();
+  let stored = null;
+  try { stored = localStorage.getItem("typstbit.source"); } catch {}
+  const initial = shared ?? stored ?? DEFAULT_SOURCE;
+  if (shared !== null) history.replaceState(null, "", location.pathname + location.search);
   const editor = editorMod.createEditor(editorHost, {
     doc: initial,
     onChange: text => {
-      localStorage.setItem("typstbit.source", text);
+      session.update({ source: text });
+      try { localStorage.setItem("typstbit.source", text); } catch {}
       scheduleCompile(text);
     },
     onRun: () => runCommand("compile-now"),
     onCommand: id => runCommand(id),
-    onSelectionChange: () => refreshCommandStates(),
+    onSelectionChange: selection => {
+      session.update({ selection: { from: selection.from, to: selection.to } });
+      refreshCommandStates();
+    },
   });
 
   ctx = {
@@ -242,8 +262,6 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       shareDoc,
       openPdfTab,
       compileNow,
-      undo: () => undo(1),
-      redo: () => undo(-1),
     },
   };
 
@@ -267,11 +285,12 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     if (!ctx) return;
     for (const [id, button] of formatButtons) {
       button.classList.toggle("active", commandActive(id, ctx));
+      button.disabled = !commandEnabled(id, ctx);
     }
   }
 
   function renderPalette(query) {
-    paletteItems = filterCommands(query);
+    paletteItems = filterCommands(query).filter(command => commandEnabled(command.id, ctx));
     paletteIndex = 0;
     paletteList.innerHTML = "";
     paletteItems.forEach((command, index) => {
@@ -321,11 +340,27 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       else openPalette();
     }
   }, true);
+  document.addEventListener("click", event => {
+    if (palette.classList.contains("open") && !palette.contains(event.target)) closePalette();
+    closeMenu();
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closeMenu();
+  });
 
   function toast(message) {
     const node = el("div", "toast", message);
     document.body.appendChild(node);
     setTimeout(() => node.remove(), 2600);
+  }
+
+  let openMenu = null;
+
+  function closeMenu() {
+    if (openMenu) {
+      openMenu.style.display = "none";
+      openMenu = null;
+    }
   }
 
   function menuButton(label, items) {
@@ -344,14 +379,18 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       node.style.display = "block";
       node.style.width = "100%";
       node.style.textAlign = "left";
-      node.onclick = () => { menu.style.display = "none"; runCommand(item.id); };
+      node.onclick = () => { closeMenu(); runCommand(item.id); };
       menu.append(node);
     }
-    btn.onclick = e => {
-      e.stopPropagation();
-      menu.style.display = menu.style.display === "none" ? "block" : "none";
+    btn.onclick = event => {
+      event.stopPropagation();
+      const wasOpen = openMenu === menu;
+      closeMenu();
+      if (!wasOpen) {
+        menu.style.display = "block";
+        openMenu = menu;
+      }
     };
-    document.addEventListener("click", () => { menu.style.display = "none"; });
     wrap.append(btn, menu);
     return wrap;
   }
@@ -409,18 +448,18 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
 
   function scheduleCompile(source) {
     if (state.pendingTimer) clearTimeout(state.pendingTimer);
-    state.pendingTimer = setTimeout(() => { state.pendingTimer = null; startCompile(source); }, DEBOUNCE_MS);
+    const timer = setTimeout(() => { session.update({ pendingTimer: null }); startCompile(source); }, DEBOUNCE_MS);
+    session.update({ pendingTimer: timer });
   }
 
   function compileNow() {
-    if (state.pendingTimer) { clearTimeout(state.pendingTimer); state.pendingTimer = null; }
+    if (state.pendingTimer) { clearTimeout(state.pendingTimer); session.update({ pendingTimer: null }); }
     startCompile(editor.getDoc());
   }
 
   function startCompile(source) {
-    const revision = ++state.revision;
-    state.status = STATUS.COMPILING;
-    state.compilingCount += 1;
+    const revision = state.revision + 1;
+    session.update({ revision, status: STATUS.COMPILING, compilingCount: state.compilingCount + 1, source });
     setStatusUI();
     requestAnimationFrame(() => requestAnimationFrame(() => {
       let status;
@@ -432,41 +471,78 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
         compat.compileCount += 1;
       } catch (e) {
         compat.error = String(e);
-        state.diagnostics = [{ severity: "error", message: `宿主错误: ${e}` }];
-        state.status = STATUS.FAILED;
+        session.update({ diagnostics: [{ severity: "error", message: `宿主错误: ${e}` }], status: STATUS.FAILED });
         syncEditorDiagnostics();
         setStatusUI();
         return;
       }
       if (revision !== state.revision) return;
       const diags = bridge.errorJson().diagnostics ?? [];
-      state.diagnostics = diags;
       if (status === 0) {
-        state.status = STATUS.SUCCESS;
-        state.docRevision = revision;
-        state.pageCount = bridge.pageCount();
-        state.page = 0;
-        state.previewReady = false;
-        state.previewFailed = false;
+        session.update({
+          diagnostics: diags,
+          status: STATUS.SUCCESS,
+          docRevision: revision,
+          pageCount: bridge.pageCount(),
+          page: 0,
+          previewFailed: false,
+        });
         requestPdf(revision);
+        renderPreviewPage();
       } else if (status === 3) {
-        state.status = STATUS.FAILED;
+        session.update({ diagnostics: diags, status: STATUS.FAILED });
       } else {
-        state.status = STATUS.FAILED;
-        state.diagnostics = [{ severity: "error", message: `ABI 状态码 ${status}` }];
+        session.update({ diagnostics: [{ severity: "error", message: `ABI 状态码 ${status}` }], status: STATUS.FAILED });
       }
       syncEditorDiagnostics();
       setStatusUI();
     }));
   }
 
-  function requestPdf(revision) {
-    const bytes = bridge.pdf();
-    if (!bytes || revision !== state.docRevision) {
-      if (revision === state.docRevision) state.previewFailed = true;
+  function renderPreviewPage() {
+    if (state.pageCount === 0) {
       updatePreviewView();
       return;
     }
+    const page = Math.min(Math.max(state.page, 0), state.pageCount - 1);
+    const png = bridge.renderPagePng(page, state.scale);
+    if (!png) {
+      session.update({ previewFailed: true, previewReady: false });
+      updatePreviewView();
+      setStatusUI();
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([png], { type: "image/png" }));
+    const previousUrl = state.pageUrl;
+    session.update({ pageUrl: url, page, previewReady: false, previewFailed: false });
+    pageImage.onload = () => {
+      if (state.pageUrl !== url) return;
+      if (previousUrl) URL.revokeObjectURL(previousUrl);
+      session.update({ previewReady: true });
+      compat.urlSettled.set(url, true);
+      setStatusUI();
+    };
+    pageImage.onerror = () => {
+      if (state.pageUrl !== url) return;
+      session.update({ previewReady: false, previewFailed: true });
+      setStatusUI();
+    };
+    pageImage.src = url;
+    updatePreviewView();
+    setStatusUI();
+  }
+
+  function turnPage(delta) {
+    if (state.pageCount === 0) return;
+    const next = Math.min(Math.max(state.page + delta, 0), state.pageCount - 1);
+    if (next === state.page && state.pageUrl) return;
+    session.update({ page: next });
+    renderPreviewPage();
+  }
+
+  function requestPdf(revision) {
+    const bytes = bridge.pdf();
+    if (!bytes || revision !== state.docRevision) return;
     const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
     state.blobUrls.push(url);
     compat.urlRevision.set(url, revision);
@@ -474,32 +550,22 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       URL.revokeObjectURL(state.previewUrl);
       compat.revokedUrls.push(state.previewUrl);
     }
-    state.previewUrl = url;
-    state.previewReady = false;
-    pdfEmbed.onload = () => { state.previewReady = true; compat.urlSettled.set(url, true); setStatusUI(); };
-    pdfEmbed.onerror = () => { state.previewFailed = true; state.previewReady = false; setStatusUI(); };
-    setTimeout(() => {
-      if (state.previewUrl === url && !state.previewReady) {
-        state.previewReady = true;
-        compat.urlSettled.set(url, true);
-        setStatusUI();
-      }
-    }, 1500);
-    updatePreviewView();
-    setStatusUI();
+    session.update({ previewUrl: url });
   }
 
   function updatePreviewView() {
-    if (state.previewUrl) {
-      pdfEmbed.src = state.previewUrl;
-      pdfEmbed.style.display = "block";
+    const hasPage = Boolean(state.pageUrl) && state.pageCount > 0;
+    if (hasPage) {
+      pageImage.style.display = "block";
       emptyPreview.style.display = "none";
     } else {
-      pdfEmbed.removeAttribute("src");
-      pdfEmbed.style.display = "none";
+      pageImage.style.display = "none";
       emptyPreview.style.display = "block";
-      emptyPreview.textContent = state.previewFailed ? "PDF 生成失败" : state.status === STATUS.COMPILING ? "正在排版…" : "编译后将在这里显示 PDF";
+      emptyPreview.textContent = state.previewFailed ? "预览生成失败" : state.status === STATUS.COMPILING ? "正在排版…" : "编译后将在这里显示预览";
     }
+    pageIndicator.textContent = `第 ${state.pageCount ? state.page + 1 : 0} / ${state.pageCount} 页`;
+    prevButton.disabled = state.pageCount === 0 || state.page <= 0;
+    nextButton.disabled = state.pageCount === 0 || state.page >= state.pageCount - 1;
   }
 
   function openPdfTab() {
@@ -510,11 +576,6 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   function resetExample() {
     editor.setDoc(DEFAULT_SOURCE);
     compileNow();
-  }
-
-  function undo(dir) {
-    editor.focus();
-    toast(dir > 0 ? "在编辑器中使用 ⌘Z 撤销" : "在编辑器中使用 ⇧⌘Z 重做");
   }
 
   function showOutline() {
@@ -532,7 +593,13 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   async function shareDoc() {
-    const url = location.origin + location.pathname + encodeShare(editor.getDoc());
+    const doc = editor.getDoc();
+    const url = location.origin + location.pathname + encodeShare(doc);
+    if (url.length > 8000) {
+      try { localStorage.setItem("typstbit.source", doc); } catch {}
+      toast("文档较长，分享链接过长，已保存在浏览器本地");
+      return;
+    }
     try { await navigator.clipboard.writeText(url); toast("分享链接已复制（文档编码在链接中）"); }
     catch { toast(url); }
   }
@@ -542,7 +609,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       e2e_status: () => state.status,
       e2e_revision: () => state.revision,
       e2e_page_count: () => state.pageCount,
-      e2e_current_page: () => 0,
+      e2e_current_page: () => state.page,
       e2e_preview_ready: () => (state.previewReady ? 1 : 0),
       e2e_error_count: () => state.diagnostics.filter(d => d.severity === "error").length,
       e2e_compiling_count: () => state.compilingCount,
@@ -560,7 +627,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
         const needle = compat.typstTexts.get(Number(textId));
         return typeof needle === "string" && editor.getDoc().includes(needle) ? 1 : 0;
       },
-      e2e_turn_page: () => {},
+      e2e_turn_page: delta => turnPage(delta),
       e2e_doc: () => editor.getDoc(),
       e2e_cursor_line: () => editor.view.state.doc.lineAt(editor.view.state.selection.main.head).number,
     },

@@ -19,25 +19,39 @@ function lineActive(prefix) {
   };
 }
 
+const hasSelection = ctx => {
+  const { from, to } = ctx.editor.getSelection();
+  return from !== to;
+};
+
+const lineHasBlockMarker = ctx => {
+  const { from } = ctx.editor.getSelection();
+  const doc = ctx.editor.getDoc();
+  const lineStart = doc.lastIndexOf("\n", Math.max(0, from - 1)) + 1;
+  const lineEnd = doc.indexOf("\n", lineStart);
+  const line = doc.slice(lineStart, lineEnd === -1 ? doc.length : lineEnd);
+  return /^={1,6}\s+/.test(line) || /^([-+]|\d+\.)\s+/.test(line);
+};
+
 export const COMMANDS = [
   { id: "reset-example", label: "恢复示例", category: "文件", run: ctx => ctx.actions.resetExample() },
   { id: "export-pdf", label: "导出 PDF", category: "文件", run: ctx => ctx.actions.exportPdf() },
   { id: "share", label: "分享", category: "文件", run: ctx => ctx.actions.shareDoc() },
   { id: "open-search", label: "查找替换", category: "编辑", shortcut: "Mod-f", run: ctx => ctx.editor.openSearch() },
-  { id: "undo", label: "撤销", category: "编辑", shortcut: "Mod-z", run: ctx => ctx.actions.undo() },
-  { id: "redo", label: "重做", category: "编辑", shortcut: "Mod-Shift-z", run: ctx => ctx.actions.redo() },
+  { id: "undo", label: "撤销", category: "编辑", shortcut: "Mod-z", run: ctx => ctx.editor.undo() },
+  { id: "redo", label: "重做", category: "编辑", shortcut: "Mod-Shift-z", run: ctx => ctx.editor.redo() },
   { id: "open-pdf-tab", label: "新标签页打开 PDF", category: "视图", run: ctx => ctx.actions.openPdfTab() },
   { id: "command-palette", label: "命令面板", category: "视图", shortcut: "Mod-k", run: ctx => ctx.ui.openPalette() },
   { id: "shortcuts", label: "快捷键", category: "帮助", run: ctx => ctx.ui.toast(HELP_TEXT) },
-  { id: "clear-marks", label: "清除标记", category: "格式", run: ctx => ctx.editor.clearMarks() },
-  { id: "bold", label: "加粗", category: "格式", shortcut: "Mod-b", run: ctx => ctx.editor.wrapSelection("*"), active: wrapActive("*", "*") },
-  { id: "italic", label: "斜体", category: "格式", shortcut: "Mod-i", run: ctx => ctx.editor.wrapSelection("_"), active: wrapActive("_", "_") },
-  { id: "underline", label: "下划线", category: "格式", shortcut: "Mod-u", run: ctx => ctx.editor.wrapSelection("#underline[", "]"), active: wrapActive("#underline[", "]") },
+  { id: "clear-marks", label: "清除标记", category: "格式", run: ctx => ctx.editor.clearMarks(), enabled: ctx => hasSelection(ctx) || lineHasBlockMarker(ctx) },
+  { id: "bold", label: "加粗", category: "格式", shortcut: "Mod-b", run: ctx => ctx.editor.wrapSelection("*"), active: wrapActive("*", "*"), enabled: hasSelection },
+  { id: "italic", label: "斜体", category: "格式", shortcut: "Mod-i", run: ctx => ctx.editor.wrapSelection("_"), active: wrapActive("_", "_"), enabled: hasSelection },
+  { id: "underline", label: "下划线", category: "格式", shortcut: "Mod-u", run: ctx => ctx.editor.wrapSelection("#underline[", "]"), active: wrapActive("#underline[", "]"), enabled: hasSelection },
   { id: "heading", label: "标题", category: "格式", run: ctx => ctx.editor.prefixLines("= "), active: lineActive("= ") },
   { id: "list", label: "列表", category: "格式", run: ctx => ctx.editor.prefixLines("- "), active: lineActive("- ") },
   { id: "math", label: "数学", category: "格式", run: ctx => ctx.editor.insertBlock("$ x + y = z $") },
   { id: "codeblock", label: "代码块", category: "格式", run: ctx => ctx.editor.insertBlock("```typ\n\n```") },
-  { id: "quote", label: "引用", category: "格式", run: ctx => ctx.editor.insertBlock("@label") },
+  { id: "quote", label: "引用", category: "格式", run: ctx => ctx.editor.insertBlock("#quote[\n\n]") },
   { id: "compile-now", label: "立即编译", category: "编译", shortcut: "Mod-Enter", run: ctx => ctx.actions.compileNow() },
 ];
 
@@ -116,7 +130,18 @@ export function commandActive(id, ctx) {
   }
 }
 
+export function commandEnabled(id, ctx) {
+  const command = getCommand(id);
+  if (!command || !command.enabled) return true;
+  try {
+    return Boolean(command.enabled(ctx));
+  } catch {
+    return true;
+  }
+}
+
 export function runCommand(id, ctx) {
+  if (!commandEnabled(id, ctx)) return false;
   const command = getCommand(id);
   if (!command) return false;
   command.run(ctx);

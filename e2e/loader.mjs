@@ -159,15 +159,31 @@ await waitFor(() => {
 let nav = await status();
 check("multi-page doc: 3 pages", nav.pages === 3, JSON.stringify(nav));
 const viewer = await page.evaluate(() => ({
-  embed: !!document.querySelector("embed.pdf-view"),
-  srcSet: (globalThis.__typstbit.currentSource ?? "").startsWith("blob:"),
+  image: !!document.querySelector("img.pdf-view"),
+  srcSet: (document.querySelector("img.pdf-view")?.src ?? "").startsWith("blob:"),
 }));
-check("PDF viewer attached", viewer.embed && viewer.srcSet, JSON.stringify(viewer));
+check("raster preview image attached", viewer.image && viewer.srcSet, JSON.stringify(viewer));
 const pdfValid = await page.evaluate(async () => {
   const buf = await (await fetch(globalThis.__typstbit.currentSource)).arrayBuffer();
   return String.fromCharCode(...new Uint8Array(buf.slice(0, 5)));
 });
 check("preview bytes are a PDF document", pdfValid === "%PDF-", pdfValid);
+
+// --- 3b. page navigation ------------------------------------------------------
+const page0 = await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_current_page());
+check("current page starts at 0", page0 === 0, `page=${page0}`);
+await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_turn_page(1));
+const page1 = await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_current_page());
+check("next page -> 1", page1 === 1, `page=${page1}`);
+await page.evaluate(() => {
+  globalThis.__typstbit.app.exports.e2e_turn_page(1);
+  globalThis.__typstbit.app.exports.e2e_turn_page(1);
+});
+const pageLast = await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_current_page());
+check("next page clamps at the last page", pageLast === 2, `page=${pageLast}`);
+await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_turn_page(-1));
+const pagePrev = await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_current_page());
+check("prev page -> 1", pagePrev === 1, `page=${pagePrev}`);
 
 // --- 4. revoke hygiene: old blob URLs are revoked after replacement ----------
 const before = await page.evaluate(() => ({
@@ -280,10 +296,10 @@ check("fix and recover", s.status === 2 && s.errors === 0, JSON.stringify(s));
 {
   await waitFor(() => globalThis.__typstbit.app.exports.e2e_preview_ready() === 1, 30_000, "final preview ready");
   const embedBox = await page.evaluate(() => {
-    const r = document.querySelector("embed.pdf-view")?.getBoundingClientRect();
+    const r = document.querySelector("img.pdf-view")?.getBoundingClientRect();
     return r ? { w: r.width, h: r.height, shown: r.width > 100 && r.height > 100 } : null;
   });
-  check("preview pane shows the PDF viewer", embedBox?.shown === true, JSON.stringify(embedBox));
+  check("preview pane shows the page image", embedBox?.shown === true, JSON.stringify(embedBox));
   const finalPdf = await page.evaluate(async () => {
     const buf = await (await fetch(globalThis.__typstbit.currentSource)).arrayBuffer();
     return String.fromCharCode(...new Uint8Array(buf.slice(0, 5)));

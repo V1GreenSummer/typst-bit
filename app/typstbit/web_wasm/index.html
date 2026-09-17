@@ -17,7 +17,7 @@
     <script type="module">
       const params = new URLSearchParams(location.search);
       const abiWasm = params.get("abi") ?? new URL(
-        "../../../../rust/target/wasm32-unknown-unknown/release/typst_abi.wasm",
+        "../../../../rust/target/wasm32-unknown-unknown/release/typst_abi.opt.wasm",
         import.meta.url,
       );
       if (params.get("legacy") === "1") {

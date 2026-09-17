@@ -7,6 +7,7 @@ import {
   TOPBAR_ACTIONS,
   filterCommands,
   commandActive,
+  commandEnabled,
   getCommand,
   runCommand,
 } from "../app/typstbit/web_wasm/commands.js";
@@ -54,6 +55,8 @@ function makeEditor(doc, from = 0, to = from) {
     insertBlock(text) { state.doc += text; },
     openSearch() {},
     clearMarks() {},
+    undo() {},
+    redo() {},
   };
 }
 
@@ -94,6 +97,18 @@ const actionCtx = makeCtx(makeEditor(""));
 runCommand("compile-now", actionCtx);
 runCommand("reset-example", actionCtx);
 check("dispatch routes through actions", calls.includes("compile") && calls.includes("reset"));
+
+check("bold disabled without selection", commandEnabled("bold", makeCtx(makeEditor("hello", 0, 0))) === false);
+check("bold enabled with selection", commandEnabled("bold", makeCtx(makeEditor("hello", 0, 2))) === true);
+check("clear marks disabled on a plain line", commandEnabled("clear-marks", makeCtx(makeEditor("plain", 0, 0))) === false);
+check("clear marks enabled on a heading line", commandEnabled("clear-marks", makeCtx(makeEditor("= title", 0, 0))) === true);
+check("unknown command stays enabled", commandEnabled("nope", makeCtx(makeEditor(""))) === true);
+const disabledCtx = makeCtx(makeEditor("hello", 0, 0));
+check("disabled command is not dispatched", runCommand("bold", disabledCtx) === false && disabledCtx.editor.getDoc() === "hello");
+
+const quoteCtx = makeCtx(makeEditor("body", 0, 0));
+runCommand("quote", quoteCtx);
+check("quote inserts a #quote block", quoteCtx.editor.getDoc().includes("#quote["), quoteCtx.editor.getDoc());
 
 const session = createSession({ source: "hi" });
 check("session defaults", session.getState().status === STATUS.IDLE && session.getState().revision === 0);

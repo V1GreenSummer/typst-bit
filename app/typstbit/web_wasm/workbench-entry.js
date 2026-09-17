@@ -1,6 +1,6 @@
 import { EditorState, EditorSelection } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, crosshairCursor } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab, undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import { openSearchPanel, searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { StreamLanguage, syntaxHighlighting, defaultHighlightStyle, indentOnInput } from "@codemirror/language";
 import { autocompletion, closeBrackets, completionKeymap, closeBracketsKeymap } from "@codemirror/autocomplete";
@@ -174,15 +174,32 @@ export function createEditor(parent, { doc = "", onChange = () => {}, onRun = ()
 
   function clearMarks() {
     const { state } = view;
-    const lineStart = state.doc.lineAt(state.selection.main.from).number;
-    const lineEnd = state.doc.lineAt(state.selection.main.to).number;
+    const range = state.selection.main;
+    if (!range.empty) {
+      for (const [open, close] of [["#underline[", "]"], ["*", "*"], ["_", "_"]]) {
+        const before = state.sliceDoc(Math.max(0, range.from - open.length), range.from);
+        const after = state.sliceDoc(range.to, range.to + close.length);
+        if (before === open && after === close) {
+          view.dispatch({
+            changes: [
+              { from: range.from - open.length, to: range.from, insert: "" },
+              { from: range.to, to: range.to + close.length, insert: "" },
+            ],
+            userEvent: "input.typst",
+          });
+          view.focus();
+          return;
+        }
+      }
+    }
+    const lineStart = state.doc.lineAt(range.from).number;
+    const lineEnd = state.doc.lineAt(range.to).number;
     const changes = [];
     for (let n = lineStart; n <= lineEnd; n++) {
       const line = state.doc.line(n);
       const stripped = line.text
         .replace(/^={1,6}\s+/, "")
-        .replace(/^([-+]|\d+\.)\s+/, "")
-        .replace(/[*_`]/g, "");
+        .replace(/^([-+]|\d+\.)\s+/, "");
       if (stripped !== line.text) changes.push({ from: line.from, to: line.to, insert: stripped });
     }
     if (changes.length) view.dispatch({ changes, userEvent: "input.typst" });
@@ -212,6 +229,8 @@ export function createEditor(parent, { doc = "", onChange = () => {}, onRun = ()
     prefixLines,
     insertBlock,
     clearMarks,
+    undo: () => { cmUndo(view); view.focus(); },
+    redo: () => { cmRedo(view); view.focus(); },
     setDiagnostics,
     openSearch: () => openSearchPanel(view),
     focus: () => view.focus(),

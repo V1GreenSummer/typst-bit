@@ -10,6 +10,7 @@ export function createSession(initial = {}) {
     page: 0,
     diagnostics: [],
     previewUrl: null,
+    pageUrl: null,
     previewReady: false,
     previewFailed: false,
     blobUrls: [],

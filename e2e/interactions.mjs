@@ -126,7 +126,16 @@ await page.waitForTimeout(400);
 await focusEditor();
 await page.keyboard.press("Control+a");
 await fmtBtn("清除标记").click();
-check("清除标记 strips emphasis/heading marks", (await doc()) === "粗 斜 码\n标题", JSON.stringify(await doc()));
+check("清除标记 keeps inline marks and strips heading", (await doc()) === "*粗* _斜_ `码`\n标题", JSON.stringify(await doc()));
+
+await setSrc("*粗* snake_case");
+await page.waitForTimeout(400);
+await focusEditor();
+await page.keyboard.press("Control+Home");
+await page.keyboard.press("ArrowRight");
+await page.keyboard.press("Shift+ArrowRight");
+await fmtBtn("清除标记").click();
+check("清除标记 unwraps selection and keeps identifiers", (await doc()) === "粗 snake_case", JSON.stringify(await doc()));
 
 await setSrc("项目一");
 await page.waitForTimeout(400);
@@ -144,7 +153,7 @@ await page.waitForTimeout(400);
 await fmtBtn("代码块").click();
 check("代码块 inserts code fence", (await doc()).includes("```typ"));
 await fmtBtn("引用").click();
-check("引用 inserts label", (await doc()).includes("@label"));
+check("引用 inserts a quote block", (await doc()).includes("#quote["), await doc());
 
 // --- 4. search -------------------------------------------------------------------
 await setSrc("搜索测试文本 hello");
@@ -177,6 +186,11 @@ await page.keyboard.type("数学");
 await page.keyboard.press("Escape");
 await page.waitForTimeout(150);
 check("Escape closes the palette without executing", (await page.locator(".command-palette.open").count()) === 0 && !(await doc()).includes("$ x + y = z $"));
+await page.keyboard.press("Control+k");
+await page.waitForTimeout(150);
+await page.mouse.click(20, 400);
+await page.waitForTimeout(150);
+check("palette closes on outside click", (await page.locator(".command-palette.open").count()) === 0);
 
 // --- 5. compile controls + diagnostics jump --------------------------------------
 await setSrc("#set page(width: 20cm, height: 10cm)\n#let x = 1\n#badfn()");
@@ -206,7 +220,19 @@ if (!(await doc()).includes("追加文本XYZ")) {
 }
 check("redo restores typed text", (await doc()).includes("追加文本XYZ"));
 
+await setSrc("菜单撤销测试");
+await page.waitForTimeout(400);
+await focusEditor();
+await page.keyboard.type(" 追加");
+await page.waitForTimeout(200);
+await page.locator('.menubar button:text-is("Edit")').click();
+await page.locator("text=撤销 ⌘Z").first().click();
+await page.waitForTimeout(250);
+check("Edit menu undo reverts typing", !(await doc()).includes(" 追加"), await doc());
+
 // --- 7. share link round trip -------------------------------------------------------
+await setSrc("#set page(width: 20cm, height: 10cm)\n= 分享测试\n\n#lorem(3)");
+await page.waitForTimeout(400);
 await page.locator(".topbar button:text-is(\"分享\")").click();
 await page.waitForTimeout(400);
 const clip = await exports(() => navigator.clipboard.readText());
@@ -257,6 +283,13 @@ const opened = await page.evaluate(() => window.__openedUrls);
 check("open PDF in new tab yields blob URL", opened.length === 1 && opened[0] === previewUrl, `${opened.length} call(s): ${opened[0]?.slice(0, 40) ?? ""}`);
 
 // --- 9. menus -----------------------------------------------------------------------
+await page.locator('.menubar button:text-is("File")').click();
+await page.locator('.menubar button:text-is("View")').click();
+check("opening a menu closes the previous one", !(await page.locator("text=恢复示例").first().isVisible()) && (await page.locator("text=新标签页打开 PDF").first().isVisible()));
+await page.keyboard.press("Escape");
+await page.waitForTimeout(100);
+check("Escape closes menus", !(await page.locator("text=新标签页打开 PDF").first().isVisible()));
+
 await page.locator(".menubar button:text-is(\"Help\")").click();
 await page.locator("text=快捷键").first().click();
 check("Help menu shows shortcuts toast", (await page.locator(".toast").last().textContent()).includes("⌘Enter"));
@@ -287,9 +320,11 @@ await waitFor(() => globalThis.__typstbit.app.exports.e2e_status() === 2 && glob
 check("statusbar reports page count", (await page.locator(".statusbar .right").textContent()).includes("共 2 页"), await page.locator(".statusbar .right").textContent());
 
 // --- 13. share restore --------------------------------------------------------------------
+await page.goto("about:blank");
 await page.goto(clip.replace(/^http:\/\/127\.0\.0\.1:\d+/, ORIGIN));
 await waitFor(() => globalThis.__typstbit?.app?.exports?.e2e_status?.() === 2, "shared doc compile");
-check("shared link restores the document", (await doc()).includes("#pagebreak"), (await doc()).slice(0, 30));
+check("shared link restores the document", (await doc()).includes("分享测试"), (await doc()).slice(0, 30));
+check("shared hash cleared after load", await page.evaluate(() => location.hash === ""));
 
 check("no page errors during interactions", pageErrors.length === 0, pageErrors.slice(0, 3).join(" | "));
 

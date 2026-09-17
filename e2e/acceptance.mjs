@@ -51,6 +51,12 @@ const browser = await chromium.launch({
 });
 const context = await browser.newContext({ viewport: { width: 1000, height: 520 } });
 const page = await context.newPage();
+let requestedAbiPath = null;
+page.on("request", (req) => {
+  if (req.url().includes("typst_abi") && req.url().endsWith(".wasm")) {
+    requestedAbiPath = new URL(req.url()).pathname;
+  }
+});
 const consoleLines = [];
 page.on("console", (m) => consoleLines.push(`[c:${m.type()}] ${m.text().slice(0, 150)}`));
 page.on("pageerror", (e) => consoleLines.push(`[pageerror] ${e.message}`));
@@ -235,20 +241,25 @@ const sizes = (() => {
     const buf = readFileSync(path);
     return { raw: buf.length, brotli: br(buf) };
   };
-  const served = readSize(join(ROOT, "rust/target/wasm32-unknown-unknown/release/typst_abi.wasm"));
-  let abi = served;
+  const base = join(ROOT, "rust/target/wasm32-unknown-unknown/release");
+  const served = requestedAbiPath
+    ? readSize(join(ROOT, requestedAbiPath))
+    : readSize(join(base, "typst_abi.wasm"));
+  let optimized = null;
   try {
-    abi = readSize(join(ROOT, "rust/target/wasm32-unknown-unknown/release/typst_abi.opt.wasm"));
+    optimized = readSize(join(base, "typst_abi.opt.wasm"));
   } catch {}
   const app = readSize(join(ROOT, "app/typstbit/_build/wasm-gc/release/build/web_wasm/web_wasm.wasm"));
-  return { served, abi, app, firstLoad: abi.brotli + app.brotli };
+  return { served, optimized, app, firstLoad: served.brotli + app.brotli, requested: requestedAbiPath };
 })();
 console.log(
-  `[budget] typst_abi.wasm served: raw=${(sizes.served.raw / 1048576).toFixed(2)}MiB brotli=${(sizes.served.brotli / 1048576).toFixed(2)}MiB (pre-wasm-opt)`,
+  `[budget] typst_abi.wasm served: raw=${(sizes.served.raw / 1048576).toFixed(2)}MiB brotli=${(sizes.served.brotli / 1048576).toFixed(2)}MiB (${sizes.requested ?? "fallback"})`,
 );
-console.log(
-  `[budget] typst_abi.wasm shipped: raw=${(sizes.abi.raw / 1048576).toFixed(2)}MiB brotli=${(sizes.abi.brotli / 1048576).toFixed(2)}MiB (wasm-opt -Oz)`,
-);
+if (sizes.optimized) {
+  console.log(
+    `[budget] typst_abi.opt.wasm: raw=${(sizes.optimized.raw / 1048576).toFixed(2)}MiB brotli=${(sizes.optimized.brotli / 1048576).toFixed(2)}MiB`,
+  );
+}
 console.log(
   `[budget] app.wasm: raw=${(sizes.app.raw / 1048576).toFixed(2)}MiB brotli=${(sizes.app.brotli / 1048576).toFixed(2)}MiB`,
 );
@@ -267,14 +278,19 @@ check("单页 1x 渲染 P95 ≤ 200ms", num(measurements.render) <= 200 && measu
 check("100 次编辑内存增长 ≤ 20%", parseFloat(measurements.memory.growthPct) <= 20, measurements.memory.growthPct + "%");
 check("初始化（到可编辑）≤ 5s", initMs <= 5000, `${initMs}ms（桌面级，中端折算待 9.1 矩阵）`);
 check(
-  "typst_abi raw ≤ 39MiB（wasm-opt 后）",
-  sizes.abi.raw <= 39 * 1048576,
-  `${(sizes.abi.raw / 1048576).toFixed(2)}MiB`,
+  "served artifact is the optimized wasm",
+  sizes.requested?.includes("typst_abi.opt.wasm") === true,
+  sizes.requested ?? "fallback",
 );
 check(
-  "typst_abi brotli ≤ 14MiB（wasm-opt 后）",
-  sizes.abi.brotli <= 14 * 1048576,
-  `${(sizes.abi.brotli / 1048576).toFixed(2)}MiB`,
+  "typst_abi raw ≤ 39MiB（served）",
+  sizes.served.raw <= 39 * 1048576,
+  `${(sizes.served.raw / 1048576).toFixed(2)}MiB`,
+);
+check(
+  "typst_abi brotli ≤ 14MiB（served）",
+  sizes.served.brotli <= 14 * 1048576,
+  `${(sizes.served.brotli / 1048576).toFixed(2)}MiB`,
 );
 check(
   "首载总传输 ≤ 14.5MiB",

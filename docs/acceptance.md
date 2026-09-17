@@ -15,6 +15,8 @@ node drive-gui.mjs        # GUI 驱动（真实鼠标键盘 + 截图）
 
 编辑核心结构（变更 `workbench-editor-core`）：`app/typstbit/web_wasm/commands.js` 是唯一命令目录（菜单/工具栏/快捷键/⌘K 命令面板均由它派生，`runCommand(id, ctx)` 统一分发）；`session.js` 是单一编辑会话（源码、状态、revision、诊断、预览），`__typstbit` 的 `e2e_*` 与 UI 读同一会话；命令层回归走 `node commands.test.mjs`，浏览器事件路径由 `interactions.mjs` / `drive-gui.mjs` 覆盖。
 
+预览与产物（变更 `workbench-parity-fixes`）：预览面板按页栅格渲染（`typst_abi_render_page_png`），页码导航由应用控件提供，PDF 仅用于导出与新标签页；页面优先加载 `typst_abi.opt.wasm`（fetch 失败回退非优化产物），acceptance 校验实际被服务的产物。
+
 ## 9.1 场景验收
 
 | 场景 | 结果 | 方式 |
@@ -37,7 +39,7 @@ node drive-gui.mjs        # GUI 驱动（真实鼠标键盘 + 截图）
 | 短文档编译 P95 | ≤ 500ms | 3.7ms（浏览器内，生产 ABI） | ✓ |
 | 10 页文档编译 P95 | ≤ 3s | 14.0ms | ✓ |
 | 单页 1x 渲染 P95 | ≤ 200ms | 18.2ms | ✓ |
-| 100 次编辑 wasm memory 增长 | ≤ 20% | **0.0%**（33,685,504B 恒定） | ✓（comemo evict(0) 生效） |
+| 100 次编辑 wasm memory 增长 | ≤ 20% | **0.0%**（39,976,960B 恒定，含内嵌字体） | ✓（comemo evict(0) 生效） |
 | 浏览器基线 | 矩阵实测后修订 | chromium+WebGPU 全通过；Firefox（此构建）canvas2d 降级 | **基线修订见下** |
 
 ### 处理决定（超支/发现项）
