@@ -1,5 +1,6 @@
 import { createSession, STATUS } from "./session.js";
 import { loadPackageManifest, packageSpecsInSource, registerPackage } from "./packages.js";
+import { parseOutline } from "./outline.js";
 import {
   MENUS,
   FORMAT_BUTTONS,
@@ -211,7 +212,10 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       const search = el("button", "", "⌕ 搜索");
       search.onclick = () => runCommand("open-search");
       const outline = el("button", "", "☷ 文档大纲");
-      outline.onclick = showOutline;
+      outline.onclick = event => {
+        event.stopPropagation();
+        toggleOutline();
+      };
       tools.append(search, outline);
       return tools;
     })(),
@@ -329,6 +333,11 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   const paletteList = el("div", "command-list");
   palette.append(paletteInput, paletteList);
   document.body.appendChild(palette);
+
+  const outlinePanel = el("div", "outline-panel");
+  outlinePanel.append(el("div", "outline-head", "文档大纲"), el("div", "outline-list"));
+  const outlineList = outlinePanel.lastChild;
+  document.body.appendChild(outlinePanel);
   let paletteItems = [];
   let paletteIndex = 0;
 
@@ -384,6 +393,42 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     editor.focus();
   }
 
+  function toggleOutline() {
+    if (outlinePanel.classList.contains("open")) closeOutline();
+    else openOutline();
+  }
+
+  function openOutline() {
+    const entries = parseOutline(editor.getDoc());
+    outlineList.innerHTML = "";
+    if (entries.length === 0) {
+      outlineList.append(el("div", "outline-empty", "文档没有标题"));
+    } else {
+      for (const entry of entries) {
+        const item = el("div", "outline-item");
+        item.style.paddingLeft = `${8 + (entry.level - 1) * 12}px`;
+        item.append(el("span", "outline-title", entry.title));
+        item.onclick = () => {
+          closeOutline();
+          jumpToLine(entry.line);
+        };
+        outlineList.append(item);
+      }
+    }
+    outlinePanel.classList.add("open");
+  }
+
+  function closeOutline() {
+    outlinePanel.classList.remove("open");
+  }
+
+  function jumpToLine(line) {
+    const doc = editor.view.state.doc;
+    const target = Math.min(Math.max(line, 1), doc.lines);
+    editor.view.dispatch({ selection: { anchor: doc.line(target).from }, scrollIntoView: true });
+    editor.focus();
+  }
+
   paletteInput.oninput = () => renderPalette(paletteInput.value);
   paletteInput.onkeydown = event => {
     if (event.key === "ArrowDown") { event.preventDefault(); selectPalette(paletteIndex + 1); }
@@ -400,10 +445,14 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }, true);
   document.addEventListener("click", event => {
     if (palette.classList.contains("open") && !palette.contains(event.target)) closePalette();
+    if (outlinePanel.classList.contains("open") && !outlinePanel.contains(event.target)) closeOutline();
     closeMenu();
   });
   document.addEventListener("keydown", event => {
-    if (event.key === "Escape") closeMenu();
+    if (event.key === "Escape") {
+      closeMenu();
+      closeOutline();
+    }
   });
 
   function toast(message) {
@@ -682,12 +731,6 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   function resetExample() {
     editor.setDoc(DEFAULT_SOURCE);
     compileNow();
-  }
-
-  function showOutline() {
-    const doc = editor.getDoc();
-    const heads = [...doc.matchAll(/^={1,6}\s+(.*)$/gm)].map((m, i) => `${m[0].trimStart().split(" ")[0]} ${m[1]}`);
-    toast(heads.length ? "大纲: " + heads.join(" · ") : "文档没有标题");
   }
 
   function exportPdf() {

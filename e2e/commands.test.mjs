@@ -12,6 +12,7 @@ import {
   runCommand,
 } from "../app/typstbit/web_wasm/commands.js";
 import { createSession, STATUS } from "../app/typstbit/web_wasm/session.js";
+import { parseOutline } from "../app/typstbit/web_wasm/outline.js";
 
 const failures = [];
 const check = (name, cond, detail = "") => {
@@ -109,6 +110,11 @@ check("disabled command is not dispatched", runCommand("bold", disabledCtx) === 
 const quoteCtx = makeCtx(makeEditor("body", 0, 0));
 runCommand("quote", quoteCtx);
 check("quote inserts a #quote block", quoteCtx.editor.getDoc().includes("#quote["), quoteCtx.editor.getDoc());
+
+const outline = parseOutline("= A <one>\n\n== B\n\n```\n= NotHeading\n```\n\n=== C");
+check("outline strips labels and tracks levels", outline.map(e => `${e.level}:${e.title}:${e.line}`).join("|") === "1:A:1|2:B:3|3:C:9", JSON.stringify(outline));
+check("outline ignores fenced code", !outline.some(e => e.title === "NotHeading"));
+check("outline of empty source is empty", parseOutline("just text").length === 0);
 
 const session = createSession({ source: "hi" });
 check("session defaults", session.getState().status === STATUS.IDLE && session.getState().revision === 0);

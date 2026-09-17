@@ -78,3 +78,12 @@ button:hover { background: #e7eaf0; }
 .formatbar button:disabled { opacity: .45; cursor: default; }
 .formatbar button:disabled:hover { background: transparent; }
 .page-indicator { color: var(--muted); font-size: 12px; }
+
+.outline-panel { position: fixed; z-index: 55; top: 12vh; left: 24px; width: 280px; max-height: 60vh; background: white; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 18px 48px #1d273340; display: none; overflow: hidden; }
+.outline-panel.open { display: flex; flex-direction: column; }
+.outline-head { padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--muted); }
+.outline-list { overflow: auto; padding: 6px; }
+.outline-item { display: flex; align-items: center; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.outline-item:hover { background: #eef2ff; }
+.outline-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.outline-empty { padding: 10px; color: var(--muted); font-size: 12px; }

@@ -314,8 +314,18 @@ check("Edit > 查找替换 opens search", await page.locator(".cm-panel.cm-searc
 await page.keyboard.press("Escape");
 
 // --- 10. sidebar tools ---------------------------------------------------------------
-await page.locator(".sidebar-tools button:text-is(\"☷ 文档大纲\")").click();
-check("大纲 lists headings", (await page.locator(".toast").last().textContent()).includes("大纲"));
+await page.locator('.sidebar-tools button:text-is("☷ 文档大纲")').click();
+await page.waitForSelector(".outline-panel.open", { state: "visible", timeout: 5000 });
+const outlineTitles = await page.locator(".outline-item .outline-title").allTextContents();
+check("outline lists clean headings without labels", outlineTitles.join("|") === "The Typst Playground|Basics|Next steps", outlineTitles.join("|"));
+const nextHeadingLine = await exports(() => {
+  const doc = globalThis.__typstbit.app.exports.e2e_doc();
+  return doc.split("\n").findIndex(line => line.startsWith("= Next steps")) + 1;
+});
+await page.locator('.outline-item:has-text("Next steps")').click();
+await page.waitForTimeout(150);
+check("outline click jumps to the heading line", (await cursorLine()) === nextHeadingLine, `${await cursorLine()} vs ${nextHeadingLine}`);
+check("outline closes after the jump", (await page.locator(".outline-panel.open").count()) === 0);
 
 // --- 11. IME commit -------------------------------------------------------------------
 await focusEditor();

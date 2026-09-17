@@ -130,11 +130,13 @@ await page.keyboard.press("Escape");
 
 // ---- 6. sidebar outline --------------------------------------------------
 await page.click('.sidebar button:has-text("文档大纲")');
-await waitToast("大纲:");
-const outlineToast = await page.evaluate(() => [...document.querySelectorAll(".toast")].map(x => x.textContent).find(t => t.includes("大纲:")));
-check("outline toast lists heading", (outlineToast ?? "").includes("直接 GUI 驱动测试"), outlineToast);
+await page.waitForSelector(".outline-panel.open", { state: "visible", timeout: 5000 });
+const outlineTitles = await page.locator(".outline-item .outline-title").allTextContents();
+check("outline panel lists headings", outlineTitles.includes("直接 GUI 驱动测试"), outlineTitles.join("|"));
+await page.locator('.outline-item:has-text("直接 GUI 驱动测试")').click();
+await page.waitForTimeout(150);
+check("outline click focuses the heading", (await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_cursor_line())) >= 1);
 await shot("outline");
-await page.waitForTimeout(2700);
 
 // ---- 7. 清除标记 strips heading marker ----------------------------------
 await page.click(".editor-host .cm-content");
