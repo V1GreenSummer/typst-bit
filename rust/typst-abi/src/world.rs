@@ -14,6 +14,7 @@ use std::collections::HashMap;
 
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Bytes, Datetime, Duration};
+use typst::syntax::package::PackageSpec;
 use typst::syntax::{FileId, PathError, RootedPath, Source, VirtualPath, VirtualRoot};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
@@ -154,6 +155,34 @@ impl VfsWorld {
         let version = self.versions.get(&id).copied().unwrap_or(0) + 1;
         self.versions.insert(id, version);
         if path_is_typst_source(&path.display()) {
+            let text = std::str::from_utf8(data).map_err(|_| PathReject::NotUtf8)?;
+            self.sources.insert(id, Source::new(id, text.to_string()));
+            self.blobs.remove(&id);
+        } else {
+            self.sources.remove(&id);
+            self.blobs.insert(id, Bytes::new(data.to_vec()));
+        }
+        Ok(())
+    }
+
+    /// Insert or replace a file inside a bundled Typst package. `path` is
+    /// relative to the package root (e.g. `typst.toml`, `src/lib.typ`).
+    pub fn set_package_file(
+        &mut self,
+        spec: &PackageSpec,
+        path: &str,
+        data: &[u8],
+    ) -> Result<(), PathReject> {
+        let rooted = if path.starts_with('/') {
+            path.to_string()
+        } else {
+            format!("/{path}")
+        };
+        let vpath = VirtualPath::new(&rooted).map_err(|_| PathReject::Invalid)?;
+        let id = RootedPath::new(VirtualRoot::Package(spec.clone()), vpath).intern();
+        let version = self.versions.get(&id).copied().unwrap_or(0) + 1;
+        self.versions.insert(id, version);
+        if path_is_typst_source(&rooted) {
             let text = std::str::from_utf8(data).map_err(|_| PathReject::NotUtf8)?;
             self.sources.insert(id, Source::new(id, text.to_string()));
             self.blobs.remove(&id);

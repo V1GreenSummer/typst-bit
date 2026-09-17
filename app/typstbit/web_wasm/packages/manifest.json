@@ -1,0 +1,19 @@
+{
+  "packages": [
+    {
+      "spec": "@preview/tiaoma:0.3.0",
+      "root": "preview/tiaoma/0.3.0",
+      "url": "https://packages.typst.org/preview/tiaoma-0.3.0.tar.gz",
+      "sha256": "c646c3f41c3f1a062ff1558f070187ac970b7d350f00b31f45133e059c9981be",
+      "files": [
+        "3rdparty_license.html",
+        "LICENSE",
+        "README.md",
+        "lib.typ",
+        "license.html",
+        "typst.toml",
+        "zint_typst_plugin.wasm"
+      ]
+    }
+  ]
+}

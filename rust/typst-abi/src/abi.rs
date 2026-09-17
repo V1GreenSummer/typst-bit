@@ -267,6 +267,41 @@ pub unsafe extern "C" fn typst_abi_set_file(
     }
 }
 
+/// Insert or replace a file inside a bundled Typst package.
+/// `spec` is `@namespace/name:version`; `path` is package-relative.
+#[no_mangle]
+pub unsafe extern "C" fn typst_abi_set_package_file(
+    spec_ptr: usize,
+    spec_len: usize,
+    path_ptr: usize,
+    path_len: usize,
+    data_ptr: usize,
+    data_len: usize,
+) -> u32 {
+    unsafe {
+        let spec_text = match read_path(spec_ptr, spec_len) {
+            Ok(spec) => spec,
+            Err(status) => return status,
+        };
+        let path = match read_path(path_ptr, path_len) {
+            Ok(path) => path,
+            Err(status) => return status,
+        };
+        let spec = match spec_text.parse::<typst::syntax::package::PackageSpec>() {
+            Ok(spec) => spec,
+            Err(_) => return E_INVALID_ARG,
+        };
+        let data = match read_bytes(data_ptr, data_len) {
+            Ok(data) => data,
+            Err(status) => return status,
+        };
+        match state().world.set_package_file(&spec, path, data) {
+            Ok(()) => OK,
+            Err(_) => E_INVALID_ARG,
+        }
+    }
+}
+
 /// Remove a file from the VFS. Removing an unknown path succeeds (idempotent).
 #[no_mangle]
 pub unsafe extern "C" fn typst_abi_remove_file(

@@ -15,6 +15,8 @@ node drive-gui.mjs        # GUI 驱动（真实鼠标键盘 + 截图）
 
 编辑核心结构（变更 `workbench-editor-core`）：`app/typstbit/web_wasm/commands.js` 是唯一命令目录（菜单/工具栏/快捷键/⌘K 命令面板均由它派生，`runCommand(id, ctx)` 统一分发）；`session.js` 是单一编辑会话（源码、状态、revision、诊断、预览），`__typstbit` 的 `e2e_*` 与 UI 读同一会话；命令层回归走 `node commands.test.mjs`，浏览器事件路径由 `interactions.mjs` / `drive-gui.mjs` 覆盖。
 
+预置包（变更 `bundle-preview-packages`）：`@preview/tiaoma:0.3.0`（MIT，sha256 c646c3f41c3f1a062ff1558f070187ac970b7d350f00b31f45133e059c9981be）随应用预置，首次导入时从同源懒加载并由 `typst_abi_set_package_file` 注册，之后编译离线可用；新增包执行 `python3 tools/vendor-typst-package.py @preview/<name>:<version>` 并提交 `app/typstbit/web_wasm/packages/`。
+
 预览与产物（变更 `workbench-parity-fixes`）：预览面板按页栅格渲染（`typst_abi_render_page_png`），页码导航由应用控件提供，PDF 仅用于导出与新标签页；页面优先加载 `typst_abi.opt.wasm`（fetch 失败回退非优化产物），acceptance 校验实际被服务的产物。
 
 ## 9.1 场景验收

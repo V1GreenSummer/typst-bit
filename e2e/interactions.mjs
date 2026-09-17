@@ -192,6 +192,15 @@ await page.mouse.click(20, 400);
 await page.waitForTimeout(150);
 check("palette closes on outside click", (await page.locator(".command-palette.open").count()) === 0);
 
+// --- 4c. bundled package import ---------------------------------------------------
+const revBeforePackage = await exports(() => globalThis.__typstbit.app.exports.e2e_revision());
+await setSrc('#import "@preview/tiaoma:0.3.0": qrcode\n#qrcode("https://typst.app", width: 3em)');
+await page.waitForFunction(rev => {
+  const app = globalThis.__typstbit.app;
+  return app.exports.e2e_revision() > rev && app.exports.e2e_status() === 2;
+}, revBeforePackage, { timeout: 60000 });
+check("bundled @preview package compiles", (await exports(() => globalThis.__typstbit.app.exports.e2e_error_count())) === 0);
+
 // --- 5. compile controls + diagnostics jump --------------------------------------
 await setSrc("#set page(width: 20cm, height: 10cm)\n#let x = 1\n#badfn()");
 await waitFor(() => globalThis.__typstbit.app.exports.e2e_status() === 3, "error compile");

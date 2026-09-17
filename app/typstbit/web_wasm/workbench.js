@@ -1,4 +1,5 @@
 import { createSession, STATUS } from "./session.js";
+import { loadPackageManifest, packageSpecsInSource, registerPackage } from "./packages.js";
 import {
   MENUS,
   FORMAT_BUTTONS,
@@ -62,6 +63,12 @@ class Abi {
     const ptr = this.ex.typst_abi_export_pdf();
     if (ptr === 0) return null;
     return this.outLen(ptr);
+  }
+  setPackageFile(spec, path, bytes) {
+    const [sp, slen] = this.putStr(spec);
+    const [pp, plen] = this.putStr(path);
+    const [dp, dlen] = this.put(bytes);
+    return this.ex.typst_abi_set_package_file(sp, slen, pp, plen, dp, dlen);
   }
   errorJson() {
     const ptr = this.ex.typst_abi_error_json();
@@ -223,6 +230,11 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
 
   const session = createSession({ scale: 1500 });
   const state = session.state;
+
+  let packageManifest = null;
+  let packageManifestPromise = null;
+  const loadedPackages = new Set();
+  const pendingPackages = new Map();
 
   compat.blobUrls = state.blobUrls;
   compat.session = session;
@@ -457,7 +469,55 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     startCompile(editor.getDoc());
   }
 
+  function sourceNeedsPackages(source) {
+    const specs = packageSpecsInSource(source);
+    if (specs.length === 0) return false;
+    if (!packageManifest) return true;
+    return specs.some(spec => {
+      const entry = packageManifest.find(item => item.spec === spec);
+      return entry ? !loadedPackages.has(spec) : false;
+    });
+  }
+
+  async function ensurePackages(source) {
+    const specs = packageSpecsInSource(source);
+    if (specs.length === 0) return;
+    if (!packageManifest) {
+      packageManifestPromise ??= loadPackageManifest().catch(() => []);
+      packageManifest = await packageManifestPromise;
+    }
+    const needed = specs
+      .map(spec => packageManifest.find(entry => entry.spec === spec))
+      .filter(entry => entry && !loadedPackages.has(entry.spec));
+    if (needed.length === 0) return;
+    await Promise.all(
+      needed.map(entry => {
+        if (!pendingPackages.has(entry.spec)) {
+          pendingPackages.set(
+            entry.spec,
+            registerPackage(bridge, entry)
+              .then(() => loadedPackages.add(entry.spec))
+              .finally(() => pendingPackages.delete(entry.spec)),
+          );
+        }
+        return pendingPackages.get(entry.spec);
+      }),
+    );
+  }
+
   function startCompile(source) {
+    if (sourceNeedsPackages(source)) {
+      session.update({ status: STATUS.COMPILING, compilingCount: state.compilingCount + 1 });
+      setStatusUI();
+      ensurePackages(source)
+        .then(() => startCompile(editor.getDoc()))
+        .catch(error => {
+          session.update({ status: STATUS.FAILED, diagnostics: [{ severity: "error", message: `包加载失败: ${error}` }] });
+          syncEditorDiagnostics();
+          setStatusUI();
+        });
+      return;
+    }
     const revision = state.revision + 1;
     session.update({ revision, status: STATUS.COMPILING, compilingCount: state.compilingCount + 1, source });
     setStatusUI();
