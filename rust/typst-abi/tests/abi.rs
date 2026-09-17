@@ -311,3 +311,20 @@ fn multi_file_vfs_via_abi() {
     assert_eq!(compile(), OK);
     assert_eq!(typst_abi_page_count(), 1);
 }
+
+#[test]
+fn export_svg_round_trip() {
+    let _guard = lock();
+    assert_eq!(typst_abi_reset(), OK);
+    compile_ok("Hello\n#pagebreak()\nSecond");
+
+    let ptr = unsafe { typst_abi_export_svg(0) };
+    assert_ne!(ptr, 0, "page 0 exports");
+    let len = out_len() as usize;
+    let svg = unsafe { std::slice::from_raw_parts(ptr as *const u8, len) };
+    let text = std::str::from_utf8(svg).expect("svg is utf-8");
+    assert!(text.starts_with("<svg"), "{}", &text[..text.len().min(40)]);
+    assert!(text.contains("</svg>"));
+
+    assert_eq!(unsafe { typst_abi_export_svg(2) }, 0, "out of range page");
+}

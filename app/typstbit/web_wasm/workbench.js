@@ -2,6 +2,17 @@ import { createSession, STATUS } from "./session.js";
 import { loadPackageManifest, packageSpecsInSource, registerPackage } from "./packages.js";
 import { parseOutline } from "./outline.js";
 import {
+  definePlugin,
+  getPlugins,
+  createPluginHost,
+  getSettingsSchemas,
+  readSettings,
+  writeSettings,
+} from "./plugins.js";
+import wordCountPlugin from "./plugins/word-count.js";
+import imageHostPlugin from "./plugins/image-host.js";
+import exportFormatsPlugin from "./plugins/export-formats.js";
+import {
   MENUS,
   FORMAT_BUTTONS,
   TOPBAR_ACTIONS,
@@ -9,6 +20,7 @@ import {
   commandActive,
   commandEnabled,
   getCommand,
+  registerCommands,
   runCommand as dispatchCommand,
 } from "./commands.js";
 
@@ -186,9 +198,10 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   );
 
   const menubar = el("div", "menubar");
+  const menubarGrow = el("span", "grow");
   menubar.append(
     ...MENUS.map(menu => menuButton(menu.label, menu.items)),
-    el("span", "grow"),
+    menubarGrow,
     el("span", "", "⌘K 搜索命令"),
   );
 
@@ -429,6 +442,190 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     editor.focus();
   }
 
+  const exporters = new Map();
+  const pluginMenuItems = [];
+  let pluginMenuButton = null;
+
+  const typstApi = {
+    exportPdf: () => bridge.pdf(),
+    exportSvg: page => {
+      const ptr = bridge.ex.typst_abi_export_svg(page);
+      if (!ptr) return null;
+      return bridge.outLen(ptr);
+    },
+    renderPagePng: (page, scaleMilli) => bridge.renderPagePng(page, scaleMilli),
+  };
+
+  function addMenu(label, items) {
+    const button = menuButton(label, items);
+    menubar.insertBefore(button, menubarGrow);
+    return button;
+  }
+
+  function refreshPluginMenu() {
+    if (pluginMenuButton) pluginMenuButton.remove();
+    pluginMenuButton = menuButton("插件", [...pluginMenuItems]);
+    menubar.insertBefore(pluginMenuButton, menubarGrow);
+  }
+
+  function registerExporter(exporter) {
+    if (!exporter?.id || exporters.has(exporter.id)) return;
+    exporters.set(exporter.id, exporter);
+    const commandId = `plugin.export.${exporter.id}`;
+    registerCommands([{
+      id: commandId,
+      label: `导出 ${exporter.label}`,
+      category: "插件",
+      run: () => runExporter(exporter.id),
+    }]);
+    pluginMenuItems.push({ id: commandId });
+  }
+
+  function runExporter(id) {
+    const exporter = exporters.get(id);
+    if (!exporter) return;
+    try {
+      const blob = exporter.build({ typst: typstApi, session: state, editor });
+      if (!blob) {
+        toast("导出失败：当前没有可导出的内容");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = el("a");
+      link.href = url;
+      link.download = `typstbit.${exporter.extension ?? "bin"}`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (error) {
+      toast(`导出失败: ${error}`);
+    }
+  }
+
+  const settingsPanel = el("div", "settings-panel");
+  const settingsBody = el("div", "settings-body");
+  const settingsSave = el("button", "button primary", "保存");
+  const settingsClose = el("button", "button", "关闭");
+  const settingsFooter = el("div", "settings-footer");
+  settingsFooter.append(el("span", "grow"), settingsSave, settingsClose);
+  settingsPanel.append(el("div", "settings-head", "插件设置"), settingsBody, settingsFooter);
+  document.body.appendChild(settingsPanel);
+
+  function openSettings(pluginId = null) {
+    renderSettings(pluginId);
+    settingsPanel.classList.add("open");
+  }
+
+  function closeSettings() {
+    settingsPanel.classList.remove("open");
+  }
+
+  function renderSettings(pluginId) {
+    settingsBody.innerHTML = "";
+    const entries = getSettingsSchemas().filter(entry => !pluginId || entry.pluginId === pluginId);
+    if (entries.length === 0) {
+      settingsBody.append(el("div", "outline-empty", "没有可配置的插件"));
+      return;
+    }
+    for (const entry of entries) {
+      const section = el("div", "settings-section");
+      section.append(el("div", "settings-title", entry.schema.title ?? entry.pluginId));
+      const values = readSettings(entry.pluginId);
+      for (const field of entry.schema.fields ?? []) {
+        const row = el("label", "settings-row");
+        row.append(el("span", "settings-label", field.label ?? field.key));
+        let input;
+        if (field.type === "boolean") {
+          input = el("input");
+          input.type = "checkbox";
+          input.checked = Boolean(values[field.key]);
+        } else if (field.type === "select") {
+          input = el("select");
+          for (const option of field.options ?? []) {
+            const value = option.value ?? option;
+            const node = el("option", "", option.label ?? value);
+            node.value = value;
+            input.append(node);
+          }
+          input.value = values[field.key] ?? "";
+        } else {
+          input = el("input");
+          input.type = field.type === "password" ? "password" : "text";
+          input.placeholder = field.placeholder ?? "";
+          input.value = values[field.key] ?? "";
+        }
+        input.dataset.plugin = entry.pluginId;
+        input.dataset.key = field.key;
+        input.dataset.type = field.type ?? "text";
+        row.append(input);
+        section.append(row);
+      }
+      settingsBody.append(section);
+    }
+  }
+
+  function saveSettings() {
+    const patches = new Map();
+    for (const input of settingsBody.querySelectorAll("input, select")) {
+      const pluginId = input.dataset.plugin;
+      const key = input.dataset.key;
+      if (!pluginId || !key) continue;
+      const values = patches.get(pluginId) ?? { ...readSettings(pluginId) };
+      values[key] = input.dataset.type === "boolean" ? input.checked : input.value;
+      patches.set(pluginId, values);
+    }
+    for (const [pluginId, values] of patches) writeSettings(pluginId, values);
+  }
+
+  settingsSave.onclick = () => {
+    saveSettings();
+    closeSettings();
+    toast("插件设置已保存");
+  };
+  settingsClose.onclick = closeSettings;
+
+  async function loadExternalPlugins() {
+    const urls = new Set(new URLSearchParams(location.search).getAll("plugin"));
+    try {
+      for (const url of JSON.parse(localStorage.getItem("typstbit.plugins") ?? "[]")) urls.add(url);
+    } catch {}
+    for (const url of urls) {
+      try {
+        const module = await Promise.race([
+          import(url),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
+        ]);
+        if (typeof module.default?.setup === "function") definePlugin(module.default);
+      } catch (error) {
+        console.warn(`plugin load failed: ${url}`, error);
+        toast(`插件加载失败: ${url}`);
+      }
+    }
+  }
+
+  async function setupPlugins() {
+    registerCommands([{ id: "plugin.settings", label: "插件设置…", category: "插件", run: () => openSettings() }]);
+    pluginMenuItems.push({ id: "plugin.settings" });
+    await loadExternalPlugins();
+    for (const plugin of getPlugins()) {
+      try {
+        plugin.setup(createPluginHost({
+          plugin,
+          registerCommands,
+          addMenu,
+          registerExporter,
+          openSettings,
+          toast,
+          editor,
+          session,
+          typst: typstApi,
+        }));
+      } catch (error) {
+        console.warn(`plugin setup failed: ${plugin.id}`, error);
+      }
+    }
+    refreshPluginMenu();
+  }
+
   paletteInput.oninput = () => renderPalette(paletteInput.value);
   paletteInput.onkeydown = event => {
     if (event.key === "ArrowDown") { event.preventDefault(); selectPalette(paletteIndex + 1); }
@@ -446,12 +643,14 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   document.addEventListener("click", event => {
     if (palette.classList.contains("open") && !palette.contains(event.target)) closePalette();
     if (outlinePanel.classList.contains("open") && !outlinePanel.contains(event.target)) closeOutline();
+    if (settingsPanel.classList.contains("open") && !settingsPanel.contains(event.target)) closeSettings();
     closeMenu();
   });
   document.addEventListener("keydown", event => {
     if (event.key === "Escape") {
       closeMenu();
       closeOutline();
+      closeSettings();
     }
   });
 
@@ -486,7 +685,11 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       node.style.display = "block";
       node.style.width = "100%";
       node.style.textAlign = "left";
-      node.onclick = () => { closeMenu(); runCommand(item.id); };
+      node.onclick = event => {
+        event.stopPropagation();
+        closeMenu();
+        runCommand(item.id);
+      };
       menu.append(node);
     }
     btn.onclick = event => {
@@ -781,6 +984,8 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       e2e_cursor_line: () => editor.view.state.doc.lineAt(editor.view.state.selection.main.head).number,
     },
   };
+  compat.plugins = () => getPlugins().map(plugin => plugin.id);
+  await setupPlugins();
   compat.ready = true;
   setStatusUI();
   scheduleCompile(editor.getDoc());

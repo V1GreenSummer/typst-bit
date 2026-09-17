@@ -29,7 +29,7 @@ function typstToken(stream, state) {
   }
   if (state.inMath) {
     while (!stream.eol()) { if (stream.next() === "$") { state.inMath = false; break; } }
-    return "math";
+    return "atom";
   }
   if (state.inStrong) {
     if (stream.eat("*")) { state.inStrong = false; return "strong"; }
@@ -54,7 +54,7 @@ function typstToken(stream, state) {
   if (stream.match(/<[^>\s]+>/)) return "label";
   if (stream.match(/@[A-Za-z][\w.-]*/)) return "link";
   if (stream.eat("#")) { stream.eatWhile(/[\w.-]/); return "keyword"; }
-  if (stream.eat("$")) { state.inMath = true; return "math"; }
+  if (stream.eat("$")) { state.inMath = true; return "atom"; }
   if (stream.eat('"')) { state.inString = true; return "string"; }
   if (stream.eat("`")) { state.inRaw = true; return "monospace"; }
   if (stream.eat("*")) { state.inStrong = true; return "strong"; }
@@ -92,7 +92,7 @@ const editorTheme = EditorView.baseTheme({
   ".tok-strong": { fontWeight: "700" },
   ".tok-emphasis": { fontStyle: "italic" },
   ".tok-monospace": { color: "#b45309" },
-  ".tok-math": { color: "#7c3aed" },
+  ".tok-atom": { color: "#7c3aed" },
   ".tok-list": { color: "#0f766e", fontWeight: "600" },
   ".tok-link": { color: "#0369a1", textDecoration: "underline" },
   ".tok-label": { color: "#b45309" },

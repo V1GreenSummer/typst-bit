@@ -162,6 +162,7 @@ struct State {
     png_out: Vec<u8>,
     json_out: Vec<u8>,
     pdf_out: Vec<u8>,
+    svg_out: Vec<u8>,
 }
 
 impl State {
@@ -174,6 +175,7 @@ impl State {
             png_out: Vec::new(),
             json_out: Vec::new(),
             pdf_out: Vec::new(),
+            svg_out: Vec::new(),
         }
     }
 }
@@ -452,5 +454,27 @@ pub unsafe extern "C" fn typst_abi_export_pdf() -> usize {
         st.pdf_out = bytes;
         OUT_LEN = len;
         st.pdf_out.as_ptr() as usize
+    }
+}
+
+/// Export one page of the most recent document as SVG. Returns a pointer into
+/// the SVG output buffer (valid until the next successful
+/// `typst_abi_export_svg`), or 0 when there is no document or the page index is
+/// out of range. Length in `typst_abi_out_len_ptr`.
+#[no_mangle]
+pub unsafe extern "C" fn typst_abi_export_svg(page: u32) -> usize {
+    unsafe {
+        let st = state();
+        let Some(document) = st.document.as_ref() else {
+            return 0;
+        };
+        let Some(page) = document.pages().get(page as usize) else {
+            return 0;
+        };
+        let bytes = typst_svg::svg(page, &typst_svg::SvgOptions::default()).into_bytes();
+        let len = bytes.len() as u32;
+        st.svg_out = bytes;
+        OUT_LEN = len;
+        st.svg_out.as_ptr() as usize
     }
 }

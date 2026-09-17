@@ -26,4 +26,5 @@ typst = "0.15.1"
 typst-assets = { version = "0.15.1", default-features = false }
 typst-layout = "0.15.1"
 typst-pdf = "0.15.1"
+typst-svg = "0.15.1"
 typst-render = "0.15.1"

@@ -107,13 +107,29 @@ export const TOPBAR_ACTIONS = [
   { id: "compile-now", label: "立即编译", variant: "primary" },
 ];
 
+const registeredCommands = [];
+
+export function registerCommands(commands) {
+  for (const command of commands ?? []) {
+    if (!command || typeof command.id !== "string" || typeof command.run !== "function") continue;
+    if (getCommand(command.id)) continue;
+    registeredCommands.push(command);
+  }
+}
+
+export function allCommands() {
+  return [...COMMANDS, ...registeredCommands];
+}
+
 export function getCommand(id) {
-  return COMMANDS.find(command => command.id === id) ?? null;
+  return COMMANDS.find(command => command.id === id) ??
+    registeredCommands.find(command => command.id === id) ??
+    null;
 }
 
 export function filterCommands(query = "") {
   const needle = query.trim().toLowerCase();
-  return COMMANDS.filter(command =>
+  return allCommands().filter(command =>
     !needle ||
     command.label.toLowerCase().includes(needle) ||
     command.id.includes(needle) ||

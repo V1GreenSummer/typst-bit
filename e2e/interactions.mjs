@@ -327,6 +327,36 @@ await page.waitForTimeout(150);
 check("outline click jumps to the heading line", (await cursorLine()) === nextHeadingLine, `${await cursorLine()} vs ${nextHeadingLine}`);
 check("outline closes after the jump", (await page.locator(".outline-panel.open").count()) === 0);
 
+// --- 10b. plugins --------------------------------------------------------------------
+await page.locator('.menubar button:text-is("插件")').click();
+check("plugin menu lists exports and settings", (await page.locator("text=导出 SVG（当前页）").first().isVisible()) && (await page.locator("text=插件设置…").first().isVisible()));
+const svgDownload = page.waitForEvent("download", { timeout: 15000 });
+await page.locator("text=导出 SVG（当前页）").first().click();
+const svgFile = await svgDownload;
+const svgText = await readFile(await svgFile.path(), "utf8");
+check("plugin exports SVG", svgFile.suggestedFilename() === "typstbit.svg" && svgText.startsWith("<svg"), svgText.slice(0, 30));
+await page.waitForTimeout(200);
+
+await page.keyboard.press("Control+k");
+await page.waitForTimeout(150);
+await page.keyboard.type("字数统计");
+await page.keyboard.press("Enter");
+await page.waitForTimeout(200);
+check("plugin command runs from the palette", ((await page.locator(".toast").last().textContent()) ?? "").includes("字数"), await page.locator(".toast").last().textContent());
+
+await page.locator('.menubar button:text-is("插件")').click();
+await page.locator("text=插件设置…").first().click();
+await page.waitForSelector(".settings-panel.open", { state: "visible", timeout: 5000 });
+await page.locator('.settings-row input[data-key="endpoint"]').fill("https://img.example.com/upload");
+await page.locator('.settings-panel button:has-text("保存")').click();
+await page.waitForTimeout(200);
+await page.locator('.menubar button:text-is("插件")').click();
+await page.locator("text=插件设置…").first().click();
+await page.waitForSelector(".settings-panel.open", { state: "visible", timeout: 5000 });
+const endpointValue = await page.inputValue('.settings-row input[data-key="endpoint"]');
+check("plugin settings persist", endpointValue === "https://img.example.com/upload", endpointValue);
+await page.keyboard.press("Escape");
+
 // --- 11. IME commit -------------------------------------------------------------------
 await focusEditor();
 await page.keyboard.insertText("中文输入法测试——段落文本。");
