@@ -10,6 +10,7 @@
     "interactions": "node interactions.mjs",
     "commands": "node commands.test.mjs",
     "plugins": "node plugins.test.mjs",
+    "mcp": "node mcp.test.mjs",
     "fresh-build": "node fresh-build.mjs",
     "build:workbench": "node build-workbench.mjs"
   },
