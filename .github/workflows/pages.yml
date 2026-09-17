@@ -39,6 +39,7 @@ jobs:
         run: |
           mkdir -p _site/rust/target/wasm32-unknown-unknown/release
           cp -r app _site/app
+          cp -r examples _site/examples
           cp rust/target/wasm32-unknown-unknown/release/typst_abi.opt.wasm _site/rust/target/wasm32-unknown-unknown/release/
           cp index.html _site/index.html
           touch _site/.nojekyll
