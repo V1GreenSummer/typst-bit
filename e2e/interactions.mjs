@@ -148,10 +148,20 @@ await page.waitForTimeout(400);
 await focusEditor();
 await fmtBtn("数学").click();
 check("数学 inserts math block", (await doc()).includes("$ x + y = z $"));
+{
+  const pos = await exports(() => globalThis.__typstbit.app.exports.e2e_cursor_pos());
+  const source = await doc();
+  check("math places cursor inside the expression", source.slice(pos - 2, pos) === "$ ", JSON.stringify(source.slice(pos - 3, pos + 3)));
+}
 await setSrc("#lorem(3)");
 await page.waitForTimeout(400);
 await fmtBtn("代码块").click();
 check("代码块 inserts code fence", (await doc()).includes("```typ"));
+{
+  const pos = await exports(() => globalThis.__typstbit.app.exports.e2e_cursor_pos());
+  const source = await doc();
+  check("code block places cursor inside the fence", source.slice(pos - 7, pos) === "```typ\n", JSON.stringify(source.slice(pos - 8, pos + 2)));
+}
 await fmtBtn("引用").click();
 check("引用 inserts a quote block", (await doc()).includes("#quote["), await doc());
 

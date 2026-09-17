@@ -244,7 +244,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       const head = el("div", "pane-head");
       const tab = el("div", "tab", "main.typ");
       tab.style.paddingRight = "12px";
-      head.append(tab, el("span", "dirty", "未保存"), el("span", "grow"), el("span", "dirty", "Typst"));
+      head.append(tab, el("span", "dirty", "自动保存"), el("span", "grow"), el("span", "dirty", "Typst"));
       return head;
     })(),
     editorHost,
@@ -986,7 +986,8 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
 
   function openPdfTab() {
     if (!state.previewUrl) { toast("还没有可打开的 PDF，请先编译"); return; }
-    window.open(state.previewUrl, "_blank");
+    const opened = window.open(state.previewUrl, "_blank");
+    if (!opened) toast("浏览器拦截了新标签页，请允许弹出窗口或使用「导出 PDF」");
   }
 
   function resetExample() {
@@ -1039,6 +1040,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       },
       e2e_turn_page: delta => turnPage(delta),
       e2e_doc: () => editor.getDoc(),
+      e2e_cursor_pos: () => editor.view.state.selection.main.head,
       e2e_cursor_line: () => editor.view.state.doc.lineAt(editor.view.state.selection.main.head).number,
     },
   };

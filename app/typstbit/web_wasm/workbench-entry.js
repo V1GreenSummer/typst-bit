@@ -164,11 +164,16 @@ export function createEditor(parent, { doc = "", onChange = () => {}, onRun = ()
     view.focus();
   }
 
-  function insertBlock(text) {
+  function insertBlock(text, cursorOffset = null) {
     const { state } = view;
     const range = state.selection.main;
-    const insert = (range.empty ? "" : "\n") + text + "\n";
-    view.dispatch(state.replaceSelection(insert), { userEvent: "input.typst", scrollIntoView: true });
+    const prefix = range.empty ? "" : "\n";
+    const insert = prefix + text + "\n";
+    const transaction = state.replaceSelection(insert);
+    if (cursorOffset !== null) {
+      transaction.selection = EditorSelection.cursor(range.from + prefix.length + cursorOffset);
+    }
+    view.dispatch(transaction, { userEvent: "input.typst", scrollIntoView: true });
     view.focus();
   }
 

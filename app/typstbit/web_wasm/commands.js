@@ -49,9 +49,9 @@ export const COMMANDS = [
   { id: "underline", label: "下划线", category: "格式", shortcut: "Mod-u", run: ctx => ctx.editor.wrapSelection("#underline[", "]"), active: wrapActive("#underline[", "]"), enabled: hasSelection },
   { id: "heading", label: "标题", category: "格式", run: ctx => ctx.editor.prefixLines("= "), active: lineActive("= ") },
   { id: "list", label: "列表", category: "格式", run: ctx => ctx.editor.prefixLines("- "), active: lineActive("- ") },
-  { id: "math", label: "数学", category: "格式", run: ctx => ctx.editor.insertBlock("$ x + y = z $") },
-  { id: "codeblock", label: "代码块", category: "格式", run: ctx => ctx.editor.insertBlock("```typ\n\n```") },
-  { id: "quote", label: "引用", category: "格式", run: ctx => ctx.editor.insertBlock("#quote[\n\n]") },
+  { id: "math", label: "数学", category: "格式", run: ctx => ctx.editor.insertBlock("$ x + y = z $", 2) },
+  { id: "codeblock", label: "代码块", category: "格式", run: ctx => ctx.editor.insertBlock("```typ\n\n```", 7) },
+  { id: "quote", label: "引用", category: "格式", run: ctx => ctx.editor.insertBlock("#quote[\n\n]", 8) },
   { id: "compile-now", label: "立即编译", category: "编译", shortcut: "Mod-Enter", run: ctx => ctx.actions.compileNow() },
 ];
 

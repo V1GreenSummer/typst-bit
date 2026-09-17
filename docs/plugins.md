@@ -89,6 +89,9 @@ api.export.register({
 - **字数统计**（`app/typstbit/web_wasm/plugins/word-count.js`）：注册命令，统计字数/字符/行数。
 - **图床设置**（`plugins/image-host.js`）：设置表单 + 插入图床模板命令。
 - **导出格式**（`plugins/export-formats.js`）：注册 SVG / PNG 导出。
+- **文档模板**（`plugins/templates.js`）：插入封面、双栏文章、代码报告模板。
+
+外部插件可在「插件」菜单 →「插件设置…」的“外部插件”区域填入 URL 即时加载（也可用 `?plugin=` 或 `localStorage` 的 `typstbit.plugins`）。
 
 ## 可以用插件做什么
 
