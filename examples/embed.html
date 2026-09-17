@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Typst.bit 嵌入示例</title>
+    <style>
+      body { margin: 0; font: 14px/1.5 system-ui, sans-serif; display: grid; grid-template-columns: 1fr 1fr; height: 100vh; }
+      textarea { border: 0; border-right: 1px solid #dfe3e8; padding: 12px; font: 13px/1.6 ui-monospace, monospace; resize: none; outline: none; }
+      main { display: flex; flex-direction: column; min-width: 0; }
+      header { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid #dfe3e8; }
+      header button { font: inherit; padding: 5px 10px; border: 1px solid #cbd2da; border-radius: 5px; background: white; cursor: pointer; }
+      #status { margin-left: auto; color: #6b7280; font-size: 12px; }
+      #preview { flex: 1; min-height: 0; object-fit: contain; background: #e7e9ed; width: 100%; }
+    </style>
+  </head>
+  <body>
+    <textarea id="source" spellcheck="false">= Embedded Typst
+
+Compiled directly in the browser with the shared
+`typst_abi` wasm, no server involved.
+
+$ integral_0^1 x^2 dif x = 1/3 $
+</textarea>
+    <main>
+      <header>
+        <button id="compile">编译</button>
+        <button id="pdf">导出 PDF</button>
+        <span id="status">等待编译…</span>
+      </header>
+      <img id="preview" alt="预览" />
+    </main>
+    <script type="module">
+      const WASM = new URL("../rust/target/wasm32-unknown-unknown/release/typst_abi.opt.wasm", import.meta.url);
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+
+      async function load() {
+        try {
+          return (await WebAssembly.instantiateStreaming(fetch(WASM), {})).instance.exports;
+        } catch {
+          const bytes = await (await fetch(WASM)).arrayBuffer();
+          return (await WebAssembly.instantiate(bytes, {})).instance.exports;
+        }
+      }
+
+      const abi = await load();
+      const status = document.querySelector("#status");
+      const preview = document.querySelector("#preview");
+
+      function put(data) {
+        const bytes = typeof data === "string" ? encoder.encode(data) : data;
+        const ptr = abi.typst_abi_alloc(bytes.length);
+        new Uint8Array(abi.memory.buffer, ptr, bytes.length).set(bytes);
+        return [ptr, bytes.length];
+      }
+
+      function out(ptr) {
+        const len = new DataView(abi.memory.buffer).getUint32(abi.typst_abi_out_len_ptr(), true);
+        return new Uint8Array(abi.memory.buffer, ptr, len).slice();
+      }
+
+      function compile(source) {
+        const [pathPtr, pathLen] = put("/main.typ");
+        const [dataPtr, dataLen] = put(source);
+        abi.typst_abi_set_file(pathPtr, pathLen, dataPtr, dataLen);
+        const [mainPtr, mainLen] = put("/main.typ");
+        abi.typst_abi_set_main(mainPtr, mainLen);
+        return abi.typst_abi_compile();
+      }
+
+      function render(page = 0, scale = 1.5) {
+        const ptr = abi.typst_abi_render_page_png(page, scale * 1000);
+        return ptr === 0 ? null : out(ptr);
+      }
+
+      function run() {
+        const source = document.querySelector("#source").value;
+        const result = compile(source);
+        const pages = abi.typst_abi_page_count();
+        if (result !== 0) {
+          status.textContent = `编译失败（状态码 ${result}）`;
+          return;
+        }
+        const png = render(0);
+        if (png) preview.src = URL.createObjectURL(new Blob([png], { type: "image/png" }));
+        status.textContent = `就绪 · ${pages} 页`;
+      }
+
+      document.querySelector("#compile").onclick = run;
+      document.querySelector("#pdf").onclick = () => {
+        const ptr = abi.typst_abi_export_pdf();
+        if (ptr === 0) return;
+        const url = URL.createObjectURL(new Blob([out(ptr)], { type: "application/pdf" }));
+        const link = Object.assign(document.createElement("a"), { href: url, download: "typstbit.pdf" });
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      };
+      run();
+    </script>
+  </body>
+</html>

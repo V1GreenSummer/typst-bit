@@ -55,6 +55,19 @@ export function defineSettings(pluginId, schema) {
   schemas.set(pluginId, schema);
 }
 
+export function readExternalPlugins() {
+  try {
+    const parsed = JSON.parse(storageGet("typstbit.plugins") ?? "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writeExternalPlugins(urls) {
+  storageSet("typstbit.plugins", JSON.stringify([...new Set(urls)]));
+}
+
 export function getSettingsSchemas() {
   return [...schemas.entries()].map(([pluginId, schema]) => ({ pluginId, schema }));
 }

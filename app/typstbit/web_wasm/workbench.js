@@ -8,10 +8,13 @@ import {
   getSettingsSchemas,
   readSettings,
   writeSettings,
+  readExternalPlugins,
+  writeExternalPlugins,
 } from "./plugins.js";
 import wordCountPlugin from "./plugins/word-count.js";
 import imageHostPlugin from "./plugins/image-host.js";
 import exportFormatsPlugin from "./plugins/export-formats.js";
+import templatesPlugin from "./plugins/templates.js";
 import {
   MENUS,
   FORMAT_BUTTONS,
@@ -521,9 +524,41 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
 
   function renderSettings(pluginId) {
     settingsBody.innerHTML = "";
+    if (!pluginId) {
+      const external = el("div", "settings-section");
+      external.append(el("div", "settings-title", "外部插件"));
+      const urls = readExternalPlugins();
+      for (const url of urls) {
+        const row = el("div", "settings-row");
+        row.append(el("span", "settings-label", url.length > 48 ? `${url.slice(0, 48)}…` : url));
+        const remove = el("button", "button", "移除");
+        remove.onclick = () => {
+          writeExternalPlugins(urls.filter(item => item !== url));
+          renderSettings(pluginId);
+          toast("已移除，刷新后完全生效");
+        };
+        row.append(remove);
+        external.append(row);
+      }
+      const addRow = el("div", "settings-row");
+      const addInput = el("input", "plugin-url-input");
+      addInput.type = "text";
+      addInput.placeholder = "插件 URL（ES module，默认导出 definePlugin）";
+      const addButton = el("button", "button", "添加");
+      addButton.onclick = async () => {
+        const url = addInput.value.trim();
+        if (!url) return;
+        addInput.value = "";
+        await addExternalPlugin(url);
+        renderSettings(pluginId);
+      };
+      addRow.append(el("span", "settings-label", "添加插件"), addInput, addButton);
+      external.append(addRow);
+      settingsBody.append(external);
+    }
     const entries = getSettingsSchemas().filter(entry => !pluginId || entry.pluginId === pluginId);
     if (entries.length === 0) {
-      settingsBody.append(el("div", "outline-empty", "没有可配置的插件"));
+      if (pluginId) settingsBody.append(el("div", "outline-empty", "该插件没有设置项"));
       return;
     }
     for (const entry of entries) {
@@ -583,18 +618,51 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   };
   settingsClose.onclick = closeSettings;
 
+  async function loadPluginUrl(url) {
+    const module = await Promise.race([
+      import(url),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
+    ]);
+    if (typeof module.default?.setup !== "function") throw new Error("module has no plugin default export");
+    return module.default;
+  }
+
+  function setupPlugin(plugin) {
+    plugin.setup(createPluginHost({
+      plugin,
+      registerCommands,
+      addMenu,
+      registerExporter,
+      openSettings,
+      toast,
+      editor,
+      session,
+      typst: typstApi,
+    }));
+  }
+
+  async function addExternalPlugin(url) {
+    const urls = readExternalPlugins();
+    if (!urls.includes(url)) writeExternalPlugins([...urls, url]);
+    try {
+      const plugin = definePlugin(await loadPluginUrl(url));
+      setupPlugin(plugin);
+      refreshPluginMenu();
+      toast(`插件已加载: ${plugin.name ?? plugin.id}`);
+      return true;
+    } catch (error) {
+      console.warn(`plugin load failed: ${url}`, error);
+      toast("插件加载失败，已保存，刷新后可重试");
+      return false;
+    }
+  }
+
   async function loadExternalPlugins() {
     const urls = new Set(new URLSearchParams(location.search).getAll("plugin"));
-    try {
-      for (const url of JSON.parse(localStorage.getItem("typstbit.plugins") ?? "[]")) urls.add(url);
-    } catch {}
+    for (const url of readExternalPlugins()) urls.add(url);
     for (const url of urls) {
       try {
-        const module = await Promise.race([
-          import(url),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
-        ]);
-        if (typeof module.default?.setup === "function") definePlugin(module.default);
+        definePlugin(await loadPluginUrl(url));
       } catch (error) {
         console.warn(`plugin load failed: ${url}`, error);
         toast(`插件加载失败: ${url}`);
@@ -608,17 +676,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     await loadExternalPlugins();
     for (const plugin of getPlugins()) {
       try {
-        plugin.setup(createPluginHost({
-          plugin,
-          registerCommands,
-          addMenu,
-          registerExporter,
-          openSettings,
-          toast,
-          editor,
-          session,
-          typst: typstApi,
-        }));
+        setupPlugin(plugin);
       } catch (error) {
         console.warn(`plugin setup failed: ${plugin.id}`, error);
       }

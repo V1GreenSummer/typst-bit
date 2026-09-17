@@ -355,7 +355,20 @@ await page.locator("text=插件设置…").first().click();
 await page.waitForSelector(".settings-panel.open", { state: "visible", timeout: 5000 });
 const endpointValue = await page.inputValue('.settings-row input[data-key="endpoint"]');
 check("plugin settings persist", endpointValue === "https://img.example.com/upload", endpointValue);
+
+const probeCode = 'export default { id: "probe", name: "Probe", setup(api) { api.commands.register([{ id: "probe.hi", label: "Probe 命令", category: "插件", run: (ctx) => ctx.ui.toast("probe-ok") }]); } };';
+const probeUrl = "data:text/javascript," + encodeURIComponent(probeCode);
+await page.locator(".plugin-url-input").fill(probeUrl);
+await page.locator('.settings-row button:text-is("添加")').click();
+await page.waitForTimeout(400);
+check("external plugin loads from a URL", ((await page.locator(".toast").last().textContent()) ?? "").includes("插件已加载"), await page.locator(".toast").last().textContent());
 await page.keyboard.press("Escape");
+await page.keyboard.press("Control+k");
+await page.waitForTimeout(150);
+await page.keyboard.type("Probe 命令");
+await page.keyboard.press("Enter");
+await page.waitForTimeout(200);
+check("external plugin command runs", ((await page.locator(".toast").last().textContent()) ?? "").includes("probe-ok"), await page.locator(".toast").last().textContent());
 
 // --- 11. IME commit -------------------------------------------------------------------
 await focusEditor();
