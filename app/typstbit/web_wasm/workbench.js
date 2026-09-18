@@ -452,7 +452,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
 
   const exporters = new Map();
   const pluginHosts = new Map();
-  const pluginMenuItems = [];
+  const pluginSections = new Map();
   let pluginMenuButton = null;
 
   const typstApi = {
@@ -471,13 +471,27 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     return button;
   }
 
+  function pluginSection(plugin) {
+    if (!pluginSections.has(plugin.id)) {
+      pluginSections.set(plugin.id, { title: plugin.name ?? plugin.id, items: [] });
+    }
+    return pluginSections.get(plugin.id);
+  }
+
   function refreshPluginMenu() {
     if (pluginMenuButton) pluginMenuButton.remove();
-    pluginMenuButton = menuButton("插件", [...pluginMenuItems]);
+    const items = [];
+    for (const section of pluginSections.values()) {
+      items.push({ header: section.title });
+      items.push(...section.items);
+    }
+    items.push({ separator: true });
+    items.push({ id: "plugin.settings", label: "插件设置…" });
+    pluginMenuButton = menuButton("插件", items);
     menubar.insertBefore(pluginMenuButton, menubarGrow);
   }
 
-  function registerExporter(exporter) {
+  function registerExporter(exporter, plugin) {
     if (!exporter?.id || exporters.has(exporter.id)) return;
     exporters.set(exporter.id, exporter);
     const commandId = `plugin.export.${exporter.id}`;
@@ -487,7 +501,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       category: "插件",
       run: () => runExporter(exporter.id),
     }]);
-    pluginMenuItems.push({ id: commandId });
+    pluginSection(plugin).items.push({ id: commandId, label: `导出 ${exporter.label}` });
   }
 
   function runExporter(id) {
@@ -648,9 +662,14 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   function setupPlugin(plugin) {
     const host = createPluginHost({
       plugin,
-      registerCommands,
+      registerCommands: commands => {
+        const list = commands ?? [];
+        registerCommands(list);
+        const section = pluginSection(plugin);
+        for (const command of list) section.items.push({ id: command.id, label: command.label });
+      },
       addMenu,
-      registerExporter,
+      registerExporter: exporter => registerExporter(exporter, plugin),
       openSettings,
       toast,
       editor,
@@ -692,7 +711,6 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
 
   async function setupPlugins() {
     registerCommands([{ id: "plugin.settings", label: "插件设置…", category: "插件", run: () => openSettings() }]);
-    pluginMenuItems.push({ id: "plugin.settings" });
     await loadExternalPlugins();
     for (const plugin of getPlugins()) {
       try {
@@ -756,8 +774,17 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       position: "absolute", top: "28px", left: "0", zIndex: "30",
       background: "white", border: "1px solid var(--line)", borderRadius: "6px",
       boxShadow: "0 8px 24px #1d273326", padding: "4px", display: "none", minWidth: "180px",
+      maxHeight: "70vh", overflow: "auto",
     });
     for (const item of items) {
+      if (item.separator) {
+        menu.append(el("div", "menu-separator"));
+        continue;
+      }
+      if (item.header) {
+        menu.append(el("div", "menu-header", item.header));
+        continue;
+      }
       const command = getCommand(item.id);
       const node = el("button", "button", item.label ?? command?.label ?? item.id);
       node.style.display = "block";

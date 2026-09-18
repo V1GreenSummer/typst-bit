@@ -339,7 +339,7 @@ check("outline closes after the jump", (await page.locator(".outline-panel.open"
 
 // --- 10b. plugins --------------------------------------------------------------------
 await page.locator('.menubar button:text-is("插件")').click();
-check("plugin menu lists exports and settings", (await page.locator("text=导出 SVG（当前页）").first().isVisible()) && (await page.locator("text=插件设置…").first().isVisible()));
+check("plugin menu lists exports and settings", (await page.locator("text=导出 SVG（当前页）").first().isVisible()) && (await page.locator("text=插件设置…").first().isVisible()) && (await page.locator("text=插入二维码").first().isVisible()) && (await page.locator(".menu-header").first().isVisible()));
 const svgDownload = page.waitForEvent("download", { timeout: 15000 });
 await page.locator("text=导出 SVG（当前页）").first().click();
 const svgFile = await svgDownload;
