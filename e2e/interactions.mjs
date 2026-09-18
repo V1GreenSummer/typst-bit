@@ -416,13 +416,22 @@ check("external plugin command runs", ((await page.locator(".toast").last().text
 
   await page.keyboard.press("Control+k");
   await page.waitForTimeout(150);
-  await page.keyboard.type("外观设置");
+  await page.keyboard.type("主题与布局");
   await page.keyboard.press("Enter");
   await page.waitForSelector(".settings-panel.open", { state: "visible", timeout: 5000 });
-  await page.locator('.settings-row input[data-key="editorFontSize"]').fill("16");
+  await page.locator('.settings-row select[data-key="theme"]').selectOption("dark");
+  await page.locator('.settings-row input[data-key="accent"]').fill("#ff6600");
+  await page.locator('.settings-row input[data-key="sidebarWidth"]').fill("220");
+  await page.locator('.settings-row input[data-key="compact"]').check();
   await page.locator('.settings-panel button:has-text("保存")').click();
   await page.waitForTimeout(250);
-  check("appearance settings apply CSS", await page.evaluate(() => document.querySelector('style[data-plugin="appearance"]')?.textContent?.includes("16px")));
+  check("theme plugin switches to dark", await page.evaluate(() => document.body.dataset.theme === "dark"));
+  check("theme plugin overrides variables and layout", await page.evaluate(() => {
+    const style = getComputedStyle(document.body);
+    return style.getPropertyValue("--accent").trim() === "#ff6600"
+      && style.getPropertyValue("--sidebar-width").trim() === "220px"
+      && document.body.classList.contains("compact");
+  }));
   await page.keyboard.press("Escape");
 }
 

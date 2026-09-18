@@ -19,7 +19,7 @@ import templatesPlugin from "./plugins/templates.js";
 import qrcodePlugin from "./plugins/qrcode.js";
 import exportHtmlPlugin from "./plugins/export-html.js";
 import sourceToolsPlugin from "./plugins/source-tools.js";
-import appearancePlugin from "./plugins/appearance.js";
+import themePlugin from "./plugins/theme.js";
 import {
   MENUS,
   FORMAT_BUTTONS,
@@ -555,6 +555,34 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   const pluginSections = new Map();
   let pluginMenuButton = null;
 
+  function themedStyle(pluginId, attribute) {
+    let tag = document.querySelector(`style[data-plugin-${attribute}="${pluginId}"]`);
+    if (!tag) {
+      tag = document.createElement("style");
+      tag.dataset[`plugin${attribute[0].toUpperCase()}${attribute.slice(1)}`] = pluginId;
+      document.head.append(tag);
+    }
+    return tag;
+  }
+
+  const themeApi = {
+    setVariables: (pluginId, variables) => {
+      const body = Object.entries(variables ?? {}).map(([key, value]) => `  ${key}: ${value};`).join("\n");
+      const selectors = 'body:not([data-theme]), body[data-theme="dark"], body[data-theme="sepia"]';
+      themedStyle(pluginId, "theme").textContent = body ? `${selectors} {\n${body}\n}` : "";
+    },
+    addStyle: (pluginId, css) => {
+      themedStyle(pluginId, "style").textContent = css ?? "";
+    },
+    setBodyAttribute: (name, value) => {
+      if (value === null || value === undefined) document.body.removeAttribute(name);
+      else document.body.setAttribute(name, String(value));
+    },
+    setBodyClass: (name, enabled) => {
+      document.body.classList.toggle(name, Boolean(enabled));
+    },
+  };
+
   const typstApi = {
     exportPdf: () => bridge.pdf(),
     exportSvg: page => {
@@ -775,6 +803,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       editor,
       session,
       typst: typstApi,
+      theme: themeApi,
     });
     pluginHosts.set(plugin.id, host);
     plugin.setup(host);

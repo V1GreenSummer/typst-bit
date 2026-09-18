@@ -82,6 +82,7 @@ export function createPluginHost({
   editor,
   session,
   typst,
+  theme,
 }) {
   return {
     id: plugin.id,
@@ -97,6 +98,12 @@ export function createPluginHost({
     ui: {
       toast,
       openSettings: () => openSettings(plugin.id),
+    },
+    theme: {
+      setVariables: variables => theme.setVariables(plugin.id, variables),
+      addStyle: css => theme.addStyle(plugin.id, css),
+      setBodyAttribute: (name, value) => theme.setBodyAttribute(name, value),
+      setBodyClass: (name, enabled) => theme.setBodyClass(name, enabled),
     },
     editor,
     session,

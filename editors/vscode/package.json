@@ -1,0 +1,44 @@
+{
+  "name": "typstbit-preview",
+  "displayName": "Typst.bit Preview",
+  "description": "Local Typst preview/export powered by the Typst.bit wasm ABI (no network).",
+  "version": "0.0.1",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:typst"
+  ],
+  "contributes": {
+    "commands": [
+      { "command": "typstbit.preview", "title": "Typst.bit: 预览当前文件" },
+      { "command": "typstbit.exportPdf", "title": "Typst.bit: 导出 PDF" },
+      { "command": "typstbit.copyMcpConfig", "title": "Typst.bit: 复制 MCP 配置" }
+    ],
+    "menus": {
+      "editor/title": [
+        { "command": "typstbit.preview", "when": "resourceExtname == .typ" }
+      ]
+    },
+    "configuration": {
+      "title": "Typst.bit",
+      "properties": {
+        "typstbit.abiPath": {
+          "type": "string",
+          "default": "",
+          "description": "typst_abi.opt.wasm 路径；留空时使用扩展 assets/ 内的副本"
+        },
+        "typstbit.packagesPath": {
+          "type": "string",
+          "default": "",
+          "description": "预置包目录（含 manifest.json）；留空时使用扩展 assets/packages"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node ../../e2e/vscode-bridge.test.mjs"
+  }
+}
