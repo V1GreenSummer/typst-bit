@@ -20,6 +20,20 @@ const TEMPLATES = [
     body: "#set page(columns: 2, margin: 2cm)",
   },
   {
+    id: "slides",
+    label: "幻灯片（16:9）",
+    body: [
+      '#set page(paper: "presentation-16-9", margin: 1.5cm)',
+      "#set text(size: 18pt)",
+      "#show heading.where(level: 1): it => pagebreak(weak: true) + it",
+      "= 第一页",
+      "",
+      "正文内容。",
+      "",
+      "= 第二页",
+    ].join("\n"),
+  },
+  {
     id: "code-report",
     label: "代码报告",
     body: [

@@ -380,6 +380,52 @@ await page.keyboard.press("Enter");
 await page.waitForTimeout(200);
 check("external plugin command runs", ((await page.locator(".toast").last().textContent()) ?? "").includes("probe-ok"), await page.locator(".toast").last().textContent());
 
+// --- 10c. default plugins ------------------------------------------------------------
+{
+  const typDownload = page.waitForEvent("download", { timeout: 15000 });
+  await page.keyboard.press("Control+k");
+  await page.waitForTimeout(150);
+  await page.keyboard.type("下载 .typ 源码");
+  await page.keyboard.press("Enter");
+  const typFile = await typDownload;
+  check("source tools download .typ", typFile.suggestedFilename() === "main.typ", typFile.suggestedFilename());
+  await page.waitForTimeout(200);
+
+  await page.locator('.menubar button:text-is("插件")').click();
+  const htmlDownload = page.waitForEvent("download", { timeout: 20000 });
+  await page.locator("text=导出 网页 HTML（全部页面）").first().click();
+  const htmlFile = await htmlDownload;
+  const htmlText = await readFile(await htmlFile.path(), "utf8");
+  check("export HTML embeds SVG pages", htmlFile.suggestedFilename() === "typstbit.html" && htmlText.includes("<svg"), htmlFile.suggestedFilename());
+
+  await setSrc("= 二维码\n\nhttps://typst.app");
+  const revBeforeQr = await exports(() => globalThis.__typstbit.app.exports.e2e_revision());
+  await focusEditor();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Shift+End");
+  await page.keyboard.press("Control+k");
+  await page.waitForTimeout(150);
+  await page.keyboard.type("插入二维码");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(rev => {
+    const app = globalThis.__typstbit.app;
+    return app.exports.e2e_revision() > rev && app.exports.e2e_status() === 2;
+  }, revBeforeQr, { timeout: 60000 });
+  check("qrcode plugin inserts a tiaoma call", (await doc()).includes('#qrcode("https://typst.app"') && (await doc()).includes("@preview/tiaoma"), (await doc()).slice(0, 60));
+
+  await page.keyboard.press("Control+k");
+  await page.waitForTimeout(150);
+  await page.keyboard.type("外观设置");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(".settings-panel.open", { state: "visible", timeout: 5000 });
+  await page.locator('.settings-row input[data-key="editorFontSize"]').fill("16");
+  await page.locator('.settings-panel button:has-text("保存")').click();
+  await page.waitForTimeout(250);
+  check("appearance settings apply CSS", await page.evaluate(() => document.querySelector('style[data-plugin="appearance"]')?.textContent?.includes("16px")));
+  await page.keyboard.press("Escape");
+}
+
 // --- 11. IME commit -------------------------------------------------------------------
 await focusEditor();
 await page.keyboard.insertText("中文输入法测试——段落文本。");

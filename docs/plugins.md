@@ -48,6 +48,7 @@ https://v1greensummer.github.io/typst-bit/app/typstbit/web_wasm/index.html?plugi
 | `api.settings.get/set/all()` | 读写本插件命名空间下的设置（localStorage `typstbit.plugin.<id>`） |
 | `api.ui.toast(message)` | 轻提示 |
 | `api.ui.openSettings()` | 打开本插件的设置对话框 |
+| 插件描述符 `onSettingsChanged(api)` | 用户在设置对话框保存后回调（用于即时应用外观等） |
 | `api.editor` | 编辑器 facade：`getDoc/setDoc/getSelection/wrapSelection/prefixLines/insertBlock/clearMarks/openSearch/focus/undo/redo` |
 | `api.session` | 编辑会话：`getState/subscribe`（源码、状态、revision、诊断、页码、预览） |
 | `api.typst` | 编译产物：`exportPdf()`、`exportSvg(page)`、`renderPagePng(page, scaleMilli)`，返回 `Uint8Array` 或 `null` |
@@ -89,7 +90,11 @@ api.export.register({
 - **字数统计**（`app/typstbit/web_wasm/plugins/word-count.js`）：注册命令，统计字数/字符/行数。
 - **图床设置**（`plugins/image-host.js`）：设置表单 + 插入图床模板命令。
 - **导出格式**（`plugins/export-formats.js`）：注册 SVG / PNG 导出。
-- **文档模板**（`plugins/templates.js`）：插入封面、双栏文章、代码报告模板。
+- **文档模板**（`plugins/templates.js`）：插入封面、双栏文章、幻灯片（16:9）、代码报告模板。
+- **二维码**（`plugins/qrcode.js`）：把选中文本（或默认链接）转成 `@preview/tiaoma` 二维码，自动补 `#import`。
+- **导出网页**（`plugins/export-html.js`）：把全部页面按 SVG 内嵌导出为单文件 HTML。
+- **源码工具**（`plugins/source-tools.js`）：复制源码、下载 `main.typ`。
+- **外观设置**（`plugins/appearance.js`）：编辑器字号与预览背景色；演示 `onSettingsChanged` 回调即时生效。
 
 外部插件可在「插件」菜单 →「插件设置…」的“外部插件”区域填入 URL 即时加载（也可用 `?plugin=` 或 `localStorage` 的 `typstbit.plugins`）。
 

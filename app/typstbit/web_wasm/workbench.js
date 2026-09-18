@@ -4,6 +4,7 @@ import { parseOutline } from "./outline.js";
 import {
   definePlugin,
   getPlugins,
+  getPlugin,
   createPluginHost,
   getSettingsSchemas,
   readSettings,
@@ -15,6 +16,10 @@ import wordCountPlugin from "./plugins/word-count.js";
 import imageHostPlugin from "./plugins/image-host.js";
 import exportFormatsPlugin from "./plugins/export-formats.js";
 import templatesPlugin from "./plugins/templates.js";
+import qrcodePlugin from "./plugins/qrcode.js";
+import exportHtmlPlugin from "./plugins/export-html.js";
+import sourceToolsPlugin from "./plugins/source-tools.js";
+import appearancePlugin from "./plugins/appearance.js";
 import {
   MENUS,
   FORMAT_BUTTONS,
@@ -446,6 +451,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   const exporters = new Map();
+  const pluginHosts = new Map();
   const pluginMenuItems = [];
   let pluginMenuButton = null;
 
@@ -609,10 +615,22 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       patches.set(pluginId, values);
     }
     for (const [pluginId, values] of patches) writeSettings(pluginId, values);
+    return [...patches.keys()];
   }
 
   settingsSave.onclick = () => {
-    saveSettings();
+    const touched = saveSettings();
+    for (const pluginId of touched) {
+      const plugin = getPlugin(pluginId);
+      const host = pluginHosts.get(pluginId);
+      if (plugin?.onSettingsChanged && host) {
+        try {
+          plugin.onSettingsChanged(host);
+        } catch (error) {
+          console.warn(`plugin settings hook failed: ${pluginId}`, error);
+        }
+      }
+    }
     closeSettings();
     toast("插件设置已保存");
   };
@@ -628,7 +646,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   function setupPlugin(plugin) {
-    plugin.setup(createPluginHost({
+    const host = createPluginHost({
       plugin,
       registerCommands,
       addMenu,
@@ -638,7 +656,9 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       editor,
       session,
       typst: typstApi,
-    }));
+    });
+    pluginHosts.set(plugin.id, host);
+    plugin.setup(host);
   }
 
   async function addExternalPlugin(url) {
