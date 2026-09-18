@@ -14,12 +14,6 @@ export default definePlugin({
     });
     api.commands.register([
       {
-        id: "plugin.image-host.settings",
-        label: "图床设置…",
-        category: "插件",
-        run: () => api.ui.openSettings(),
-      },
-      {
         id: "plugin.image-host.insert",
         label: "插入图床模板",
         category: "插件",

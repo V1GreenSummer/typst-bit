@@ -349,7 +349,7 @@ await page.waitForTimeout(200);
 
 await page.keyboard.press("Control+k");
 await page.waitForTimeout(150);
-await page.keyboard.type("字数统计");
+await page.keyboard.type("统计当前文档");
 await page.keyboard.press("Enter");
 await page.waitForTimeout(200);
 check("plugin command runs from the palette", ((await page.locator(".toast").last().textContent()) ?? "").includes("字数"), await page.locator(".toast").last().textContent());
@@ -384,8 +384,10 @@ check("external plugin command runs", ((await page.locator(".toast").last().text
 {
   const typDownload = page.waitForEvent("download", { timeout: 15000 });
   await page.keyboard.press("Control+k");
+  await page.waitForSelector(".command-palette.open", { state: "visible", timeout: 5000 });
   await page.waitForTimeout(150);
   await page.keyboard.type("下载 .typ 源码");
+  await page.waitForSelector('.command-item.selected:has-text("下载 .typ 源码")', { timeout: 5000 });
   await page.keyboard.press("Enter");
   const typFile = await typDownload;
   check("source tools download .typ", typFile.suggestedFilename() === "main.typ", typFile.suggestedFilename());
@@ -393,7 +395,7 @@ check("external plugin command runs", ((await page.locator(".toast").last().text
 
   await page.locator('.menubar button:text-is("插件")').click();
   const htmlDownload = page.waitForEvent("download", { timeout: 20000 });
-  await page.locator("text=导出 网页 HTML（全部页面）").first().click();
+  await page.locator("text=导出 单文件 HTML（全部页面）").first().click();
   const htmlFile = await htmlDownload;
   const htmlText = await readFile(await htmlFile.path(), "utf8");
   check("export HTML embeds SVG pages", htmlFile.suggestedFilename() === "typstbit.html" && htmlText.includes("<svg"), htmlFile.suggestedFilename());
@@ -414,10 +416,8 @@ check("external plugin command runs", ((await page.locator(".toast").last().text
   }, revBeforeQr, { timeout: 60000 });
   check("qrcode plugin inserts a tiaoma call", (await doc()).includes('#qrcode("https://typst.app"') && (await doc()).includes("@preview/tiaoma"), (await doc()).slice(0, 60));
 
-  await page.keyboard.press("Control+k");
-  await page.waitForTimeout(150);
-  await page.keyboard.type("主题与布局");
-  await page.keyboard.press("Enter");
+  await page.locator('.menubar button:text-is("插件")').click();
+  await page.locator("text=插件设置…").first().click();
   await page.waitForSelector(".settings-panel.open", { state: "visible", timeout: 5000 });
   await page.locator('.settings-row select[data-key="theme"]').selectOption("dark");
   await page.locator('.settings-row input[data-key="accent"]').fill("#ff6600");

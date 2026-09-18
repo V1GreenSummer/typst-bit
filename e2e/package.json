@@ -12,6 +12,7 @@
     "plugins": "node plugins.test.mjs",
     "mcp": "node mcp.test.mjs",
     "vscode-bridge": "node vscode-bridge.test.mjs",
+    "cli": "node cli.test.mjs",
     "fresh-build": "node fresh-build.mjs",
     "build:workbench": "node build-workbench.mjs"
   },

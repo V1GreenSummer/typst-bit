@@ -47,7 +47,6 @@ export default definePlugin({
       ],
     });
     api.commands.register([
-      { id: "plugin.theme.settings", label: "主题与布局…", category: "插件", run: () => api.ui.openSettings() },
       {
         id: "plugin.theme.apply",
         label: "重新应用主题",

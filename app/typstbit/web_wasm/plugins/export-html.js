@@ -24,7 +24,7 @@ export default definePlugin({
   setup(api) {
     api.export.register({
       id: "html-pages",
-      label: "网页 HTML（全部页面）",
+      label: "单文件 HTML（全部页面）",
       extension: "html",
       build: ({ typst, session }) => {
         const decoder = new TextDecoder();

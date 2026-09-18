@@ -7,7 +7,7 @@ export default definePlugin({
     api.commands.register([
       {
         id: "plugin.word-count.count",
-        label: "字数统计",
+        label: "统计当前文档",
         category: "插件",
         run: ctx => {
           const text = ctx.editor.getDoc();
