@@ -11,6 +11,7 @@
 | **离线 CLI** | `tools/typstbit-cli.mjs` | `typstbit compile/pdf/png/svg/outline <file.typ>`；自动注册同目录多文件与图片、内置 `@preview` 包。适合 CI/脚本/其他应用调用 |
 | **MCP 服务器** | `tools/typstbit-mcp.mjs` | stdio JSON-RPC，5 个工具，接 Claude/Cursor 等；与网页端同编译器 |
 | **浏览器核心模块** | `app/typstbit/web_wasm/{session,commands,outline,packages,plugins}.js` | 无 DOM 依赖（有 localStorage 时用其存储，否则内存回退）；可重建自己的工具栏/面板或做无头逻辑 |
+| **MoonBit 应用核心** | `app/typstbit/app/{state,commands,outline}.mbt` | 纯逻辑、`native + wasm-gc` 双目标；命令目录/大纲/状态机单测 22 项；迁移路线见 `docs/moonbit-core.md` |
 | **字体与包工具链** | `tools/subset-cjk-fonts.py`、`tools/vendor-typst-package.py` | 生成 CJK 子集并记录源 hash；从 packages.typst.org 抓包、校验 sha256、生成 `manifest.json` |
 | **VSCode 扩展 PoC** | `editors/vscode/` | Node 侧预览/导出/诊断，F5 即用；路线图见 `docs/vscode.md` |
 | **部署与测试模板** | `.github/workflows/pages.yml`、`e2e/*.mjs` | 静态站构建发布；8 个套件覆盖编译/交互/渲染/导出/包/插件/MCP/CLI |

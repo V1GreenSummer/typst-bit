@@ -11,6 +11,20 @@ pub const DEBOUNCE_MS : Int = 300
 
 pub const DEFAULT_SOURCE : String = "#set page(width: 20cm, height: 10cm)\n= Hello, Typst!\n\n#lorem(60)"
 
+pub fn default_commands() -> Array[CommandSpec]
+
+pub fn filter_commands(Array[CommandSpec], StringView) -> Array[CommandSpec]
+
+pub fn find_command(Array[CommandSpec], String) -> CommandSpec?
+
+pub fn format_buttons() -> Array[ButtonSpec]
+
+pub fn menu_structure() -> Array[MenuSpec]
+
+pub fn parse_outline(String) -> Array[OutlineEntry]
+
+pub fn topbar_actions() -> Array[ButtonSpec]
+
 pub fn update(Model, Msg) -> (Model, Array[Action])
 
 // Errors
@@ -21,11 +35,58 @@ pub(all) enum Action {
   RequestPageImage(revision~ : Int, page~ : Int)
 } derive(Eq, @debug.Debug)
 
+pub(all) enum ActiveRule {
+  NoActive
+  Wrap(before~ : String, after~ : String)
+  LinePrefix(prefix~ : String)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct ButtonSpec {
+  id : String
+  label : String
+  variant : String?
+} derive(Eq, @debug.Debug)
+
+pub(all) struct CommandSpec {
+  id : String
+  label : String
+  category : String
+  shortcut : String?
+  active : ActiveRule
+  enabled_rule : EnabledRule
+} derive(Eq, @debug.Debug)
+pub fn CommandSpec::is_active(Self, EditorView) -> Bool
+pub fn CommandSpec::is_enabled(Self, EditorView) -> Bool
+
 pub(all) enum CompileStatus {
   Idle
   Compiling
   Success(pages~ : Int, warnings~ : Int)
   Failed(errors~ : Int, warnings~ : Int)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct EditorView {
+  doc : String
+  sel_from : Int
+  sel_to : Int
+} derive(Eq, @debug.Debug)
+pub fn EditorView::selection_is_empty(Self) -> Bool
+pub fn EditorView::slice(Self, Int, Int) -> String
+
+pub(all) enum EnabledRule {
+  AlwaysEnabled
+  NeedSelection
+  NeedSelectionOrLineMarker
+} derive(Eq, @debug.Debug)
+
+pub(all) struct MenuItem {
+  id : String
+  label : String?
+} derive(Eq, @debug.Debug)
+
+pub(all) struct MenuSpec {
+  label : String
+  items : Array[MenuItem]
 } derive(Eq, @debug.Debug)
 
 pub(all) struct Model {
@@ -61,6 +122,12 @@ pub(all) enum Msg {
   PrevPage
   NextPage
   GotoPage(page~ : Int)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct OutlineEntry {
+  level : Int
+  title : String
+  line : Int
 } derive(Eq, @debug.Debug)
 
 // Type aliases
