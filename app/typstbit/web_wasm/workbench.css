@@ -102,3 +102,17 @@ button:hover { background: #e7eaf0; }
 
 .menu-separator { height: 1px; background: var(--line); margin: 4px 2px; }
 .menu-header { padding: 7px 8px 2px; font-size: 11px; color: var(--muted); }
+
+.panel-title .panel-actions { display: flex; gap: 4px; }
+.panel-title .panel-actions button { font-size: 11px; color: var(--muted); padding: 2px 5px; border-radius: 3px; letter-spacing: 0; }
+.panel-title .panel-actions button:hover { background: #e7eaf0; }
+.file-list { overflow: auto; flex: 0 1 auto; }
+.file { display: flex; align-items: center; gap: 6px; padding: 7px 10px; cursor: pointer; color: var(--muted); font-size: 12px; border-left: 2px solid transparent; }
+.file:hover { background: #eef2ff; }
+.file.active { color: var(--ink); background: #e8edff; border-left-color: var(--accent); }
+.file.folder { cursor: default; font-weight: 600; }
+.file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.file-remove { color: #9aa3af; padding: 0 4px; }
+.file-remove:hover { color: #dc2626; background: transparent; }
+.file-input-row { padding: 6px 8px; }
+.file-input-row input { width: 100%; height: 26px; border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; font: inherit; font-size: 12px; }

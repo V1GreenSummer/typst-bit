@@ -119,6 +119,7 @@ class Abi {
     return this.ex.typst_abi_set_file(pp, plen, dp, dlen);
   }
   setMain(path) { const [pp, plen] = this.putStr(path); return this.ex.typst_abi_set_main(pp, plen); }
+  removeFile(path) { const [pp, plen] = this.putStr(path); return this.ex.typst_abi_remove_file(pp, plen); }
   compile() { return this.ex.typst_abi_compile(); }
   pageCount() { return this.ex.typst_abi_page_count(); }
   renderPagePng(page, scaleMilli) {
@@ -224,10 +225,28 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   const sidebar = el("div", "sidebar");
+  const fileList = el("div", "file-list");
+  const uploadInput = el("input", "upload-input");
+  uploadInput.type = "file";
+  uploadInput.multiple = true;
+  uploadInput.accept = ".typ,.txt,.md,.csv,.json,image/*";
+  uploadInput.style.display = "none";
   sidebar.append(
-    Object.assign(el("div", "panel-title"), { textContent: "PROJECT" }),
-    Object.assign(el("div", "file active"), { textContent: "▣ main.typ" }),
-    Object.assign(el("div", "file"), { textContent: "○ images" }),
+    (() => {
+      const head = el("div", "panel-title");
+      const actions = el("span", "panel-actions");
+      const newFile = el("button", "", "＋文件");
+      const newFolder = el("button", "", "＋文件夹");
+      const upload = el("button", "", "⬆上传");
+      newFile.onclick = () => startNewEntry("file");
+      newFolder.onclick = () => startNewEntry("folder");
+      upload.onclick = () => uploadInput.click();
+      actions.append(newFile, newFolder, upload);
+      head.append(el("span", "", "PROJECT"), el("span", "grow"), actions);
+      return head;
+    })(),
+    fileList,
+    uploadInput,
     (() => {
       const tools = el("div", "sidebar-tools");
       const search = el("button", "", "⌕ 搜索");
@@ -244,12 +263,12 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
 
   const editorPane = el("div", "editor-pane");
   const editorHost = el("div", "editor-host");
+  const editorTab = el("div", "tab", "main.typ");
+  editorTab.style.paddingRight = "12px";
   editorPane.append(
     (() => {
       const head = el("div", "pane-head");
-      const tab = el("div", "tab", "main.typ");
-      tab.style.paddingRight = "12px";
-      head.append(tab, el("span", "dirty", "自动保存"), el("span", "grow"), el("span", "dirty", "Typst"));
+      head.append(editorTab, el("span", "dirty", "自动保存"), el("span", "grow"), el("span", "dirty", "Typst"));
       return head;
     })(),
     editorHost,
@@ -315,17 +334,81 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   compat.urlSettled = new Map();
   Object.defineProperty(compat, "currentSource", { get: () => state.previewUrl ?? "" });
 
+  const project = new Map();
+  const folders = new Set();
+  let activePath = "/main.typ";
+  let applyingFile = false;
+
+  function bytesToBase64(bytes) {
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  }
+
+  function base64ToBytes(data) {
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  function loadProject() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("typstbit.project") ?? "null");
+      if (raw?.files) {
+        for (const entry of Object.entries(raw.files)) {
+          const path = entry[0];
+          const value = entry[1];
+          project.set(path, value.kind === "binary"
+            ? { kind: "binary", bytes: base64ToBytes(value.data) }
+            : { kind: "text", text: value.text ?? "" });
+        }
+        for (const folder of raw.folders ?? []) folders.add(folder);
+        if (raw.active && project.has(raw.active)) activePath = raw.active;
+      }
+    } catch {}
+    if (!project.has("/main.typ")) {
+      let legacy = null;
+      try { legacy = localStorage.getItem("typstbit.source"); } catch {}
+      project.set("/main.typ", { kind: "text", text: legacy ?? DEFAULT_SOURCE });
+    }
+  }
+
+  function saveProject() {
+    try {
+      const files = {};
+      for (const entry of project.entries()) {
+        const path = entry[0];
+        const value = entry[1];
+        files[path] = value.kind === "binary"
+          ? { kind: "binary", data: bytesToBase64(value.bytes) }
+          : { kind: "text", text: value.text };
+      }
+      localStorage.setItem("typstbit.project", JSON.stringify({ files, folders: [...folders], active: activePath }));
+    } catch {}
+  }
+
+  loadProject();
   const shared = decodeShare();
-  let stored = null;
-  try { stored = localStorage.getItem("typstbit.source"); } catch {}
-  const initial = shared ?? stored ?? DEFAULT_SOURCE;
-  if (shared !== null) history.replaceState(null, "", location.pathname + location.search);
+  if (shared !== null) {
+    project.set("/main.typ", { kind: "text", text: shared });
+    activePath = "/main.typ";
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+  const initial = project.get(activePath)?.kind === "text" ? project.get(activePath).text : DEFAULT_SOURCE;
   const editor = editorMod.createEditor(editorHost, {
     doc: initial,
     onChange: text => {
+      if (applyingFile) return;
+      const entry = project.get(activePath);
+      if (entry && entry.kind === "text") entry.text = text;
       session.update({ source: text });
       try { localStorage.setItem("typstbit.source", text); } catch {}
-      scheduleCompile(text);
+      saveProject();
+      scheduleCompile();
     },
     onRun: () => runCommand("compile-now"),
     onCommand: id => runCommand(id),
@@ -346,6 +429,23 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       openPdfTab,
       compileNow,
     },
+  };
+
+  editorHost.addEventListener("paste", event => {
+    const files = [...(event.clipboardData?.files ?? [])].filter(file => file.type.startsWith("image/"));
+    if (files.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addPastedImages(files);
+  }, true);
+  sidebar.addEventListener("dragover", event => event.preventDefault());
+  sidebar.addEventListener("drop", event => {
+    event.preventDefault();
+    if (event.dataTransfer?.files?.length) addUploadedFiles([...event.dataTransfer.files]);
+  });
+  uploadInput.onchange = () => {
+    addUploadedFiles([...uploadInput.files]);
+    uploadInput.value = "";
   };
 
   const palette = el("div", "command-palette");
@@ -832,7 +932,8 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     }
     for (const d of state.diagnostics) {
       const row = el("div", "diagnostic");
-      const loc = el("span", "location", d.start ? `第 ${d.start.line} 行` : "");
+      const where = d.file && d.file !== "/main.typ" ? `${d.file} ` : "";
+      const loc = el("span", "location", d.start ? `${where}第 ${d.start.line} 行` : "");
       const btn = el("button", "", `[${d.severity === "error" ? "错误" : "警告"}] ${d.message}`);
       if (d.start) btn.onclick = () => jumpToDiagnostic(d);
       const hint = d.hints?.length ? el("span", "location", d.hints.join(" ")) : null;
@@ -843,6 +944,9 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   function jumpToDiagnostic(d) {
+    if (d.file && d.file !== activePath && project.has(d.file)) {
+      openFile(d.file);
+    }
     const doc = editor.view.state.doc;
     const line = Math.min(d.start.line, doc.lines);
     editor.view.dispatch({
@@ -861,15 +965,182 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     })));
   }
 
-  function scheduleCompile(source) {
+  function updateEditorTab() {
+    editorTab.textContent = activePath.split("/").pop();
+  }
+
+  function renderFiles() {
+    fileList.innerHTML = "";
+    const entries = [];
+    for (const folder of folders) entries.push({ kind: "folder", path: folder });
+    for (const path of project.keys()) entries.push({ kind: "file", path });
+    entries.sort((a, b) => a.path.localeCompare(b.path));
+    for (const entry of entries) {
+      const depth = entry.path.split("/").filter(Boolean).length - 1;
+      const node = el("div", "file");
+      node.style.paddingLeft = `${10 + depth * 12}px`;
+      if (entry.kind === "folder") {
+        node.classList.add("folder");
+        node.textContent = `▸ ${entry.path.split("/").pop()}`;
+      } else {
+        const value = project.get(entry.path);
+        if (entry.path === activePath) node.classList.add("active");
+        node.append(el("span", "file-name", `${value.kind === "binary" ? "▩" : "▣"} ${entry.path.split("/").pop()}`));
+        node.onclick = () => openFile(entry.path);
+        if (entry.path !== "/main.typ") {
+          const remove = el("button", "file-remove", "✕");
+          remove.onclick = event => {
+            event.stopPropagation();
+            project.delete(entry.path);
+            if (activePath === entry.path) {
+              activePath = "/main.typ";
+              const main = project.get("/main.typ");
+              applyingFile = true;
+              editor.setDoc(main?.kind === "text" ? main.text : "");
+              applyingFile = false;
+              updateEditorTab();
+            }
+            saveProject();
+            renderFiles();
+            scheduleCompile();
+          };
+          node.append(remove);
+        }
+      }
+      fileList.append(node);
+    }
+  }
+
+  function openFile(path) {
+    const entry = project.get(path);
+    if (!entry) return;
+    if (path !== activePath) {
+      activePath = path;
+      applyingFile = true;
+      editor.setDoc(entry.kind === "text" ? entry.text : "");
+      applyingFile = false;
+      saveProject();
+      renderFiles();
+      scheduleCompile();
+    }
+    updateEditorTab();
+  }
+
+  function startNewEntry(kind) {
+    if (fileList.querySelector(".file-input-row")) return;
+    const row = el("div", "file-input-row");
+    const input = el("input");
+    input.placeholder = kind === "folder" ? "文件夹名（如 assets）" : "文件名（如 chapter1.typ 或 assets/logo.png）";
+    row.append(input);
+    fileList.prepend(row);
+    input.focus();
+    let done = false;
+    const commit = () => {
+      if (done) return;
+      done = true;
+      const raw = input.value.trim().replace(/^\/+/, "");
+      row.remove();
+      if (!raw) return;
+      if (kind === "folder") {
+        folders.add(`/${raw}`);
+        saveProject();
+        renderFiles();
+        return;
+      }
+      const path = `/${raw}`;
+      if (project.has(path)) {
+        toast("文件已存在");
+        return;
+      }
+      const isImage = /\.(png|jpe?g|gif|svg|webp)$/i.test(raw);
+      project.set(path, isImage ? { kind: "binary", bytes: new Uint8Array() } : { kind: "text", text: "" });
+      saveProject();
+      renderFiles();
+      openFile(path);
+      scheduleCompile();
+      toast(`已创建 ${path}`);
+    };
+    input.onkeydown = event => {
+      if (event.key === "Enter") commit();
+      else if (event.key === "Escape") { done = true; row.remove(); }
+    };
+    input.onblur = commit;
+  }
+
+  async function addUploadedFiles(files) {
+    let added = 0;
+    for (const file of files) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const isText = /\.(typ|txt|md|csv|json)$/i.test(file.name) || file.type.startsWith("text/");
+      const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|gif|svg|webp)$/i.test(file.name);
+      if (!isText && !isImage) continue;
+      if (isText) {
+        project.set(`/${file.name}`, { kind: "text", text: new TextDecoder().decode(bytes) });
+      } else {
+        project.set(`/images/${file.name}`, { kind: "binary", bytes });
+        folders.add("/images");
+      }
+      added += 1;
+    }
+    if (added === 0) {
+      toast("没有可添加的文件（支持 .typ/.txt/图片）");
+      return;
+    }
+    saveProject();
+    renderFiles();
+    scheduleCompile();
+    toast(`已添加 ${added} 个文件`);
+  }
+
+  async function addPastedImages(files) {
+    for (const file of files) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const ext = file.type === "image/jpeg" ? "jpg"
+        : file.type === "image/svg+xml" ? "svg"
+        : file.type === "image/gif" ? "gif" : "png";
+      const name = `paste-${Date.now()}-${Math.floor(Math.random() * 1000)}.${ext}`;
+      project.set(`/images/${name}`, { kind: "binary", bytes });
+      folders.add("/images");
+      editor.insertBlock(`#image("images/${name}")`);
+    }
+    saveProject();
+    renderFiles();
+    scheduleCompile();
+    toast(`已粘贴 ${files.length} 张图片到 images/`);
+  }
+
+  function projectMainText() {
+    const main = project.get("/main.typ");
+    return main?.kind === "text" ? main.text : "";
+  }
+
+  const syncedFiles = new Set();
+
+  function syncProjectToVfs() {
+    for (const path of [...syncedFiles]) {
+      if (!project.has(path)) {
+        bridge.removeFile(path);
+        syncedFiles.delete(path);
+      }
+    }
+    for (const entry of project.entries()) {
+      const path = entry[0];
+      const value = entry[1];
+      const status = value.kind === "binary" ? bridge.setFile(path, value.bytes) : bridge.setFile(path, value.text);
+      if (status !== 0) throw new Error(`set_file ${path} status ${status}`);
+      syncedFiles.add(path);
+    }
+  }
+
+  function scheduleCompile() {
     if (state.pendingTimer) clearTimeout(state.pendingTimer);
-    const timer = setTimeout(() => { session.update({ pendingTimer: null }); startCompile(source); }, DEBOUNCE_MS);
+    const timer = setTimeout(() => { session.update({ pendingTimer: null }); startCompile(); }, DEBOUNCE_MS);
     session.update({ pendingTimer: timer });
   }
 
   function compileNow() {
     if (state.pendingTimer) { clearTimeout(state.pendingTimer); session.update({ pendingTimer: null }); }
-    startCompile(editor.getDoc());
+    startCompile();
   }
 
   function sourceNeedsPackages(source) {
@@ -908,12 +1179,13 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     );
   }
 
-  function startCompile(source) {
+  function startCompile() {
+    const source = projectMainText();
     if (sourceNeedsPackages(source)) {
       session.update({ status: STATUS.COMPILING, compilingCount: state.compilingCount + 1 });
       setStatusUI();
       ensurePackages(source)
-        .then(() => startCompile(editor.getDoc()))
+        .then(() => startCompile())
         .catch(error => {
           session.update({ status: STATUS.FAILED, diagnostics: [{ severity: "error", message: `包加载失败: ${error}` }] });
           syncEditorDiagnostics();
@@ -927,8 +1199,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     requestAnimationFrame(() => requestAnimationFrame(() => {
       let status;
       try {
-        const set = bridge.setFile("/main.typ", source);
-        if (set !== 0) throw new Error(`set_file status ${set}`);
+        syncProjectToVfs();
         bridge.setMain("/main.typ");
         status = bridge.compile();
         compat.compileCount += 1;
@@ -1038,7 +1309,14 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   function resetExample() {
+    project.set("/main.typ", { kind: "text", text: DEFAULT_SOURCE });
+    activePath = "/main.typ";
+    applyingFile = true;
     editor.setDoc(DEFAULT_SOURCE);
+    applyingFile = false;
+    saveProject();
+    renderFiles();
+    updateEditorTab();
     compileNow();
   }
 
@@ -1051,10 +1329,10 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   async function shareDoc() {
-    const doc = editor.getDoc();
+    const doc = projectMainText();
     const url = location.origin + location.pathname + encodeShare(doc);
     if (url.length > 8000) {
-      try { localStorage.setItem("typstbit.source", doc); } catch {}
+      saveProject();
       toast("文档较长，分享链接过长，已保存在浏览器本地");
       return;
     }
@@ -1079,8 +1357,30 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       },
       e2e_set_source: textId => {
         const text = compat.typstTexts.get(Number(textId));
-        if (typeof text === "string") { editor.setDoc(text); scheduleCompile(text); }
+        if (typeof text !== "string") return;
+        project.set("/main.typ", { kind: "text", text });
+        activePath = "/main.typ";
+        applyingFile = true;
+        editor.setDoc(text);
+        applyingFile = false;
+        saveProject();
+        renderFiles();
+        updateEditorTab();
+        scheduleCompile();
       },
+      e2e_project_files: () => [...project.keys()],
+      e2e_read_file: path => {
+        const entry = project.get(path);
+        return entry ? (entry.kind === "text" ? entry.text : "<binary>") : null;
+      },
+      e2e_add_file: (path, text) => {
+        project.set(path, { kind: "text", text });
+        saveProject();
+        renderFiles();
+        scheduleCompile();
+      },
+      e2e_open_file: path => openFile(path),
+      e2e_active_file: () => activePath,
       e2e_source_contains: textId => {
         const needle = compat.typstTexts.get(Number(textId));
         return typeof needle === "string" && editor.getDoc().includes(needle) ? 1 : 0;
@@ -1094,7 +1394,9 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   compat.plugins = () => getPlugins().map(plugin => plugin.id);
   await setupPlugins();
   compat.ready = true;
+  renderFiles();
+  updateEditorTab();
   setStatusUI();
-  scheduleCompile(editor.getDoc());
+  scheduleCompile();
   return { state, editor, bridge, compat };
 }

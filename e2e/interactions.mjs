@@ -426,6 +426,65 @@ check("external plugin command runs", ((await page.locator(".toast").last().text
   await page.keyboard.press("Escape");
 }
 
+// --- 10d. multi-file project ---------------------------------------------------------
+{
+  await page.locator('.sidebar button:text-is("＋文件")').click();
+  await page.locator(".file-input-row input").fill("lib.typ");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(250);
+  check("new file opens in the editor", (await exports(() => globalThis.__typstbit.app.exports.e2e_active_file())) === "/lib.typ");
+  await focusEditor();
+  await page.keyboard.type("#let greet() = [hello from lib]");
+  await page.waitForTimeout(500);
+
+  await setSrc('= Multi file\n\n#import "lib.typ": greet\n#greet()');
+  await page.waitForFunction(() => {
+    const app = globalThis.__typstbit.app;
+    return app.exports.e2e_status() === 2 && app.exports.e2e_error_count() === 0;
+  }, null, { timeout: 60000 });
+  check("multi-file import compiles", true);
+  const projectFiles = await exports(() => globalThis.__typstbit.app.exports.e2e_project_files());
+  check("project lists both files", projectFiles.includes("/main.typ") && projectFiles.includes("/lib.typ"), projectFiles.join(","));
+
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  await page.setInputFiles(".upload-input", { name: "logo.png", mimeType: "image/png", buffer: png });
+  await page.waitForTimeout(400);
+  const afterUpload = await exports(() => globalThis.__typstbit.app.exports.e2e_project_files());
+  check("uploaded image lands in images/", afterUpload.includes("/images/logo.png"), afterUpload.join(","));
+
+  await page.evaluate(async (base64) => {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const file = new File([bytes], "clip.png", { type: "image/png" });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    document.querySelector(".cm-content").dispatchEvent(new ClipboardEvent("paste", { clipboardData: transfer, bubbles: true, cancelable: true }));
+  }, png.toString("base64"));
+  await page.waitForTimeout(500);
+  const afterPaste = await exports(() => globalThis.__typstbit.app.exports.e2e_project_files());
+  check("pasted image auto-merged into images/", afterPaste.some(path => path.startsWith("/images/paste-")), afterPaste.join(","));
+  check("paste inserts an #image reference", (await doc()).includes('#image("images/paste-'), (await doc()).slice(0, 80));
+  await page.waitForFunction(() => globalThis.__typstbit.app.exports.e2e_status() === 2, null, { timeout: 60000 });
+  check("multi-file doc with pasted image compiles", (await exports(() => globalThis.__typstbit.app.exports.e2e_error_count())) === 0);
+
+  await page.reload();
+  await page.waitForFunction(() => globalThis.__typstbit?.ready, null, { timeout: 60000 });
+  const restored = await exports(() => globalThis.__typstbit.app.exports.e2e_project_files());
+  check("project persists across reload", restored.includes("/lib.typ") && restored.some(path => path.startsWith("/images/")), restored.join(","));
+
+  await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_add_file("/broken.typ", "#let broken = "));
+  await setSrc('#import "broken.typ": broken\n#broken');
+  await page.waitForFunction(() => globalThis.__typstbit.app.exports.e2e_status() === 3, null, { timeout: 60000 });
+  const diagText = await page.locator(".diagnostic").first().textContent();
+  check("diagnostics name the failing file", (diagText ?? "").includes("/broken.typ"), diagText);
+  await page.locator(".diagnostic button").first().click();
+  await page.waitForTimeout(200);
+  check("diagnostic click opens the failing file", (await exports(() => globalThis.__typstbit.app.exports.e2e_active_file())) === "/broken.typ");
+  await setSrc("= 恢复\n\n正文");
+  await page.waitForFunction(() => globalThis.__typstbit.app.exports.e2e_status() === 2, null, { timeout: 60000 });
+}
+
 // --- 11. IME commit -------------------------------------------------------------------
 await focusEditor();
 await page.keyboard.insertText("中文输入法测试——段落文本。");
