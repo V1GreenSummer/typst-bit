@@ -241,6 +241,21 @@ export function createEditor(parent, { doc = "", onChange = () => {}, onRun = ()
     focus: () => view.focus(),
     getDoc: () => view.state.doc.toString(),
     getSelection: () => ({ from: view.state.selection.main.from, to: view.state.selection.main.to }),
+    setSelection: (from, to = from) => {
+      const start = Math.min(from, to);
+      const end = Math.max(from, to);
+      view.dispatch({ selection: { anchor: start, head: end }, scrollIntoView: true });
+    },
+    cursorPos: () => view.state.selection.main.head,
+    cursorLine: () => view.state.doc.lineAt(view.state.selection.main.head).number,
+    setCursorToLine: (line, column = 1) => {
+      const doc = view.state.doc;
+      const target = Math.min(Math.max(line, 1), doc.lines);
+      const lineObj = doc.line(target);
+      const pos = Math.min(lineObj.from + Math.max(0, column - 1), lineObj.to);
+      view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+      view.focus();
+    },
     setDoc: text => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, userEvent: "setValue" }),
   };
 }

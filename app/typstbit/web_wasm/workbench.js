@@ -251,7 +251,10 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   try { bridge.ex.spike_init?.(); } catch { /* fonts best-effort */ }
 
   bootStep("准备工作台…");
-  const editorMod = await import("./editor-bundle.js");
+  const editorModule = new URLSearchParams(location.search).get("editor") === "cmb"
+    ? "./editor-adapter-cmb.js"
+    : "./editor-bundle.js";
+  const editorMod = await import(editorModule);
   bootStep("初始化编辑器…");
 
   host.innerHTML = "";
@@ -472,7 +475,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     history.replaceState(null, "", location.pathname + location.search);
   }
   const initial = project.get(activePath)?.kind === "text" ? project.get(activePath).text : DEFAULT_SOURCE;
-  const editor = editorMod.createEditor(editorHost, {
+  const editor = await editorMod.createEditor(editorHost, {
     doc: initial,
     onChange: text => {
       if (applyingFile) return;
@@ -617,10 +620,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   function jumpToLine(line) {
-    const doc = editor.view.state.doc;
-    const target = Math.min(Math.max(line, 1), doc.lines);
-    editor.view.dispatch({ selection: { anchor: doc.line(target).from }, scrollIntoView: true });
-    editor.focus();
+    editor.setCursorToLine(line);
   }
 
   const exporters = new Map();
@@ -1049,14 +1049,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     if (d.file && d.file !== activePath && project.has(d.file)) {
       openFile(d.file);
     }
-    const doc = editor.view.state.doc;
-    const line = Math.min(d.start.line, doc.lines);
-    editor.view.dispatch({
-      selection: { anchor: doc.line(line).from + Math.min(d.start.column - 1, doc.line(line).length) },
-      effects: [],
-      scrollIntoView: true,
-    });
-    editor.focus();
+    editor.setCursorToLine(d.start.line, d.start.column);
   }
 
   function syncEditorDiagnostics() {
@@ -1492,10 +1485,11 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       },
       e2e_turn_page: delta => turnPage(delta),
       e2e_doc: () => editor.getDoc(),
-      e2e_cursor_pos: () => editor.view.state.selection.main.head,
-      e2e_cursor_line: () => editor.view.state.doc.lineAt(editor.view.state.selection.main.head).number,
+      e2e_cursor_pos: () => editor.cursorPos(),
+      e2e_cursor_line: () => editor.cursorLine(),
     },
   };
+  compat.editor = editor;
   compat.plugins = () => getPlugins().map(plugin => plugin.id);
   await setupPlugins();
   compat.ready = true;

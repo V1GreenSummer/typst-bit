@@ -13,6 +13,7 @@
     "mcp": "node mcp.test.mjs",
     "vscode-bridge": "node vscode-bridge.test.mjs",
     "cli": "node cli.test.mjs",
+    "editor-cmb": "node editor-cmb.test.mjs",
     "fresh-build": "node fresh-build.mjs",
     "build:workbench": "node build-workbench.mjs"
   },
