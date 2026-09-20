@@ -7,15 +7,6 @@ export async function loadPackageManifest() {
   return Array.isArray(data.packages) ? data.packages : [];
 }
 
-export function packageSpecsInSource(source) {
-  const specs = new Set();
-  const pattern = /@([a-z0-9-]+)\/([a-z0-9-]+):(\d+\.\d+\.\d+)/g;
-  for (const match of source.matchAll(pattern)) {
-    specs.add(`@${match[1]}/${match[2]}:${match[3]}`);
-  }
-  return [...specs];
-}
-
 export async function registerPackage(bridge, entry) {
   const base = new URL(`./packages/${entry.root}/`, import.meta.url);
   const fetched = await Promise.all(

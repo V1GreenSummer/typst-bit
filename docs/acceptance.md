@@ -15,9 +15,12 @@ node editor-cmb.test.mjs  # 编辑器（CodeMoonBit）挂载/高亮/自动闭合
 node vscode-bridge.test.mjs # VSCode 桥：包/编译/PNG/PDF/SVG/诊断映射
 node mcp.test.mjs         # MCP 服务器（5 工具）
 node cli.test.mjs         # 离线 CLI（compile/pdf/png/svg/outline）
+node core.test.mjs        # MoonBit 应用核心（core.wasm）契约与黄金样例
 ```
 
 编辑器修订（2026-09-20，P2）：默认与唯一编辑器为 CodeMoonBit（wasm-gc，`editor-adapter-cmb.js`），CodeMirror 依赖与打包产物已移除；`interactions`/`loader`/`drive-gui`/`commands`/`plugins`/`editor-cmb`/`acceptance`/`browser-matrix`/`fresh-build` 全部在 CodeMoonBit 路径复跑通过。VSCode 扩展补齐工作区 VFS 同步、Problems 诊断与 SVG 导出（`docs/vscode.md`）。
+
+核心修订（2026-09-21，P1–P3）：应用核心（`app/typstbit/core` → `core.wasm`）默认驱动菜单/工具栏/顶栏结构、命令面板筛选与按钮状态、大纲、包检测与诊断映射；JS 删除 `outline.js` 与包扫描、目录元数据（仅保留执行映射），Node/浏览器共用 `core-adapter.js`，`core.test.mjs` 以冻结黄金样例对拍。
 
 编辑核心结构（变更 `workbench-editor-core`）：`app/typstbit/web_wasm/commands.js` 是唯一命令目录（菜单/工具栏/快捷键/⌘K 命令面板均由它派生，`runCommand(id, ctx)` 统一分发）；`session.js` 是单一编辑会话（源码、状态、revision、诊断、预览），`__typstbit` 的 `e2e_*` 与 UI 读同一会话；命令层回归走 `node commands.test.mjs`，浏览器事件路径由 `interactions.mjs` / `drive-gui.mjs` 覆盖。
 

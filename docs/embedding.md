@@ -46,7 +46,9 @@ npx wasm-opt target/wasm32-unknown-unknown/release/typst_abi.wasm -Oz --strip-de
 
 ```js
 import { createSession } from ".../web_wasm/session.js";
-import { parseOutline } from ".../web_wasm/outline.js";
+import { loadCore } from ".../web_wasm/core-adapter.js";
+const core = await loadCore(new URL(".../web_wasm/core.wasm", import.meta.url));
+const outline = core.outline(source);
 import { registerCommands, filterCommands } from ".../web_wasm/commands.js";
 import { definePlugin, createPluginHost } from ".../web_wasm/plugins.js";
 ```

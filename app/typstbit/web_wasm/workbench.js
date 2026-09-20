@@ -1,6 +1,6 @@
 import { createSession, STATUS } from "./session.js";
-import { loadPackageManifest, packageSpecsInSource, registerPackage } from "./packages.js";
-import { parseOutline } from "./outline.js";
+import { loadCore } from "./core-adapter.js";
+import { loadPackageManifest, registerPackage } from "./packages.js";
 import {
   definePlugin,
   getPlugins,
@@ -21,15 +21,10 @@ import exportHtmlPlugin from "./plugins/export-html.js";
 import sourceToolsPlugin from "./plugins/source-tools.js";
 import themePlugin from "./plugins/theme.js";
 import {
-  MENUS,
-  FORMAT_BUTTONS,
-  TOPBAR_ACTIONS,
-  filterCommands,
-  commandActive,
-  commandEnabled,
-  getCommand,
   registerCommands,
   runCommand as dispatchCommand,
+  pluginCommandsList,
+  pluginCommandEnabled,
 } from "./commands.js";
 
 const DEFAULT_SOURCE = `#set text(font: ("Liberation Serif", "Noto Serif CJK SC"))
@@ -138,10 +133,16 @@ class Abi {
     const [dp, dlen] = this.put(bytes);
     return this.ex.typst_abi_set_package_file(sp, slen, pp, plen, dp, dlen);
   }
-  errorJson() {
+  errorJsonText() {
     const ptr = this.ex.typst_abi_error_json();
-    if (ptr === 0) return { diagnostics: [] };
-    try { return JSON.parse(new TextDecoder().decode(this.outLen(ptr))); }
+    if (ptr === 0) return "{\"diagnostics\":[]}";
+    try { return new TextDecoder().decode(this.outLen(ptr)); }
+    catch { return "{\"diagnostics\":[]}"; }
+  }
+
+  errorJson() {
+    const text = this.errorJsonText();
+    try { return JSON.parse(text); }
     catch { return { diagnostics: [] }; }
   }
 }
@@ -251,6 +252,17 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   try { bridge.ex.spike_init?.(); } catch { /* fonts best-effort */ }
 
   bootStep("准备工作台…");
+  let core;
+  try {
+    core = await loadCore();
+  } catch (error) {
+    bootFail(`核心加载失败：${error.message}`);
+    throw error;
+  }
+  const coreCatalog = core.commands();
+  const catalogById = new Map((coreCatalog.commands ?? []).map(command => [command.id, command]));
+  const defaultCommandIds = new Set(catalogById.keys());
+  let coreCommandStates = new Map();
   const editorMod = await import("./editor-adapter-cmb.js");
   bootStep("初始化编辑器…");
 
@@ -272,7 +284,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     el("span", "workspace", "WORKSPACE / MAIN.TYP"),
     el("span", "grow"),
     statusPill,
-    ...TOPBAR_ACTIONS.map(action =>
+    ...(coreCatalog.topbar ?? []).map(action =>
       Object.assign(el("button", action.variant ? `button ${action.variant}` : "button"), {
         textContent: action.label,
         onclick: () => runCommand(action.id),
@@ -282,14 +294,14 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   const menubar = el("div", "menubar");
   const menubarGrow = el("span", "grow");
   menubar.append(
-    ...MENUS.map(menu => menuButton(menu.label, menu.items)),
+    ...(coreCatalog.menus ?? []).map(menu => menuButton(menu.label, menu.items)),
     menubarGrow,
     el("span", "", "⌘K 搜索命令"),
   );
 
   const formatbar = el("div", "formatbar");
   const formatButtons = new Map();
-  for (const item of FORMAT_BUTTONS) {
+  for (const item of coreCatalog.formatButtons ?? []) {
     if (item.id === "open-search") formatbar.append(el("span", "grow"));
     const button = el("button", "", item.label);
     button.onclick = () => runCommand(item.id);
@@ -503,6 +515,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       compileNow,
     },
   };
+  refreshCommandStates();
 
   editorHost.addEventListener("paste", event => {
     const files = [...(event.clipboardData?.files ?? [])].filter(file => file.type.startsWith("image/"));
@@ -537,21 +550,47 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
 
   function runCommand(id) {
     if (!ctx) return false;
+    if (defaultCommandIds.has(id)) {
+      if (!coreCommandStates.has(id)) return false;
+    } else if (!pluginCommandEnabled(id, ctx)) {
+      return false;
+    }
     const executed = dispatchCommand(id, ctx);
     refreshCommandStates();
     return executed;
   }
 
   function refreshCommandStates() {
-    if (!ctx) return;
+    if (!ctx || !core) return;
+    const selection = editor.getSelection();
+    const rows = core.filterCommands("", editor.getDoc(), selection.from, selection.to);
+    coreCommandStates = new Map(rows.map(row => [row.id, row]));
     for (const [id, button] of formatButtons) {
-      button.classList.toggle("active", commandActive(id, ctx));
-      button.disabled = !commandEnabled(id, ctx);
+      const state = coreCommandStates.get(id);
+      button.classList.toggle("active", Boolean(state?.active));
+      button.disabled = !state;
     }
   }
 
+  function paletteCommands(query) {
+    const selection = editor.getSelection();
+    const rows = core
+      .filterCommands(query, editor.getDoc(), selection.from, selection.to)
+      .map(row => catalogById.get(row.id))
+      .filter(Boolean);
+    const needle = query.trim().toLowerCase();
+    const pluginRows = pluginCommandsList()
+      .filter(command =>
+        !needle ||
+        command.label.toLowerCase().includes(needle) ||
+        command.id.includes(needle) ||
+        (command.category ?? "").toLowerCase().includes(needle))
+      .filter(command => pluginCommandEnabled(command.id, ctx));
+    return [...rows, ...pluginRows];
+  }
+
   function renderPalette(query) {
-    paletteItems = filterCommands(query).filter(command => commandEnabled(command.id, ctx));
+    paletteItems = paletteCommands(query);
     paletteIndex = 0;
     paletteList.innerHTML = "";
     paletteItems.forEach((command, index) => {
@@ -593,7 +632,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   function openOutline() {
-    const entries = parseOutline(editor.getDoc());
+    const entries = core.outline(editor.getDoc());
     outlineList.innerHTML = "";
     if (entries.length === 0) {
       outlineList.append(el("div", "outline-empty", "文档没有标题"));
@@ -984,8 +1023,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
         menu.append(el("div", "menu-header", item.header));
         continue;
       }
-      const command = getCommand(item.id);
-      const node = el("button", "button", item.label ?? command?.label ?? item.id);
+      const node = el("button", "button", item.label ?? catalogById.get(item.id)?.label ?? item.id);
       node.style.display = "block";
       node.style.width = "100%";
       node.style.textAlign = "left";
@@ -1049,14 +1087,19 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     editor.setCursorToLine(d.start.line, d.start.column);
   }
 
-  function syncEditorDiagnostics() {
-    editor.setDiagnostics(state.diagnostics
+  function fallbackEditorDiagnostics() {
+    return state.diagnostics
       .filter(d => !d.file || d.file === activePath)
       .map(d => ({
         severity: d.severity, message: d.message + (d.hints?.length ? ` · ${d.hints.join(" ")}` : ""),
         line: d.start?.line ?? 1, column: d.start?.column ?? 1,
         endLine: d.end?.line ?? d.start?.line ?? 1, endColumn: d.end?.column ?? (d.start?.column ?? 1) + 1,
-      })));
+      }));
+  }
+
+  function syncEditorDiagnostics() {
+    const mapped = core.mapDiagnostics(bridge.lastErrorJsonText ?? "{\"diagnostics\":[]}", activePath);
+    editor.setDiagnostics(mapped.length > 0 ? mapped : fallbackEditorDiagnostics());
   }
 
   function updateEditorTab() {
@@ -1238,7 +1281,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   function sourceNeedsPackages(source) {
-    const specs = packageSpecsInSource(source);
+    const specs = core.packageSpecs(source);
     if (specs.length === 0) return false;
     if (!packageManifest) return true;
     return specs.some(spec => {
@@ -1248,7 +1291,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   async function ensurePackages(source) {
-    const specs = packageSpecsInSource(source);
+    const specs = core.packageSpecs(source);
     if (specs.length === 0) return;
     if (!packageManifest) {
       packageManifestPromise ??= loadPackageManifest().catch(() => []);
@@ -1307,6 +1350,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
         return;
       }
       if (revision !== state.revision) return;
+      bridge.lastErrorJsonText = bridge.errorJsonText();
       const diags = bridge.errorJson().diagnostics ?? [];
       if (status === 0) {
         session.update({

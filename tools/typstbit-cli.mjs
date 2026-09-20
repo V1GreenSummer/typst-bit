@@ -4,7 +4,7 @@ import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "n
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseOutline } from "../app/typstbit/web_wasm/outline.js";
+import { loadCore } from "../app/typstbit/web_wasm/core-adapter.js";
 
 const require = createRequire(import.meta.url);
 const { TypstAbi } = require("../editors/vscode/wasm-bridge.js");
@@ -12,6 +12,7 @@ const { TypstAbi } = require("../editors/vscode/wasm-bridge.js");
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_ABI = join(ROOT, "rust/target/wasm32-unknown-unknown/release/typst_abi.opt.wasm");
 const DEFAULT_PACKAGES = join(ROOT, "app/typstbit/web_wasm/packages");
+const CORE_WASM = join(ROOT, "app/typstbit/web_wasm/core.wasm");
 const TEXT_EXT = new Set([".typ", ".txt", ".md", ".csv", ".json"]);
 const ASSET_EXT = new Set([".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"]);
 
@@ -90,7 +91,8 @@ for (const entry of files) {
 abi.setMain(requested.vpath);
 
 if (command === "outline") {
-  console.log(JSON.stringify(parseOutline(readFileSync(requested.path, "utf8")), null, 2));
+  const core = await loadCore(readFileSync(CORE_WASM));
+  console.log(JSON.stringify(core.outline(readFileSync(requested.path, "utf8")), null, 2));
   process.exit(0);
 }
 

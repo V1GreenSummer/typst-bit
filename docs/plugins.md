@@ -114,7 +114,7 @@ api.export.register({
 - `commands.js`：命令目录（核心命令 + `registerCommands` 运行时扩展）。
 - `session.js`：编辑会话单源状态。
 - `packages.js` + `packages/`：离线 `@preview` 包懒加载。
-- `outline.js`：大纲解析（去标签、跳过代码围栏）。
+- `core-adapter.js`：MoonBit 应用核心（`core.wasm`）宿主，提供大纲、命令目录与筛选、包检测、诊断映射、主题计划、项目操作。
 - `plugins.js`：插件注册表、设置存储与宿主工厂。
 - `editor-adapter-cmb.js`：CodeMoonBit 编辑器 facade（与命令层解耦，宿主只依赖该接口）。
 

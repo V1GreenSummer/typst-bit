@@ -1,5 +1,7 @@
 import {
   "local/typstbit/typst_binding",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string",
 }
 
 supported_targets = "+native +wasm-gc +wasm"

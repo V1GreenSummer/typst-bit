@@ -1,0 +1,24 @@
+import {
+  "local/typstbit/app",
+  "moonbitlang/core/json",
+}
+
+supported_targets = "wasm-gc"
+
+pkgtype(kind: "executable")
+
+options(
+  link: {
+    "wasm-gc": {
+      "exports": [
+        "core_outline",
+        "core_commands",
+        "core_filter_commands",
+        "core_package_specs",
+        "core_map_diagnostics",
+        "core_theme_plan",
+        "core_project_op",
+      ],
+    },
+  },
+)

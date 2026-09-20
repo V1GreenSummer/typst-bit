@@ -19,9 +19,37 @@ pub fn find_command(Array[CommandSpec], String) -> CommandSpec?
 
 pub fn format_buttons() -> Array[ButtonSpec]
 
+pub fn format_number(Double, String) -> String
+
+pub fn is_hex_color(String) -> Bool
+
+pub fn is_image_path(String) -> Bool
+
+pub fn is_valid_vfs_path(String) -> Bool
+
+pub fn map_diagnostics(Array[RawDiagnostic], String) -> Array[EditorDiagnostic]
+
 pub fn menu_structure() -> Array[MenuSpec]
 
+pub fn missing_packages(Array[String], Array[String], Array[String]) -> Array[String]
+
+pub fn package_specs_in_source(String) -> Array[String]
+
 pub fn parse_outline(String) -> Array[OutlineEntry]
+
+pub fn parse_raw_diagnostics(String) -> Array[RawDiagnostic]
+
+pub fn parse_spec(String) -> PackageSpec?
+
+pub fn parse_spec_at(Array[Char], Int) -> PackageSpec?
+
+pub fn plan_theme(ThemeSettings) -> ThemePlan
+
+pub fn theme_attribute() -> String
+
+pub fn theme_ids() -> Array[String]
+
+pub fn theme_label(String) -> String
 
 pub fn topbar_actions() -> Array[ButtonSpec]
 
@@ -65,6 +93,15 @@ pub(all) enum CompileStatus {
   Failed(errors~ : Int, warnings~ : Int)
 } derive(Eq, @debug.Debug)
 
+pub(all) struct EditorDiagnostic {
+  severity : String
+  message : String
+  line : Int
+  column : Int
+  end_line : Int
+  end_column : Int
+} derive(Eq, @debug.Debug)
+
 pub(all) struct EditorView {
   doc : String
   sel_from : Int
@@ -77,6 +114,11 @@ pub(all) enum EnabledRule {
   AlwaysEnabled
   NeedSelection
   NeedSelectionOrLineMarker
+} derive(Eq, @debug.Debug)
+
+pub(all) enum FileKind {
+  TextFile
+  BinaryFile
 } derive(Eq, @debug.Debug)
 
 pub(all) struct MenuItem {
@@ -129,6 +171,71 @@ pub(all) struct OutlineEntry {
   title : String
   line : Int
 } derive(Eq, @debug.Debug)
+
+pub(all) struct PackageSpec {
+  ns : String
+  name : String
+  version : String
+  text : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct Project {
+  mut files : Array[ProjectFile]
+  mut folders : Array[String]
+  mut active : String
+} derive(Eq, @debug.Debug)
+pub fn Project::active_text(Self) -> String
+pub fn Project::add_file(Self, String, String, kind? : FileKind) -> Result[Unit, ProjectError]
+pub fn Project::add_folder(Self, String) -> Bool
+pub fn Project::apply_edit(Self, String, String) -> Bool
+pub fn Project::find(Self, String) -> ProjectFile?
+pub fn Project::from_json_string(String, String) -> Self
+pub fn Project::has(Self, String) -> Bool
+pub fn Project::new(String) -> Self
+pub fn Project::paths(Self) -> Array[String]
+pub fn Project::remove(Self, String) -> ProjectFile?
+pub fn Project::set_text(Self, String, String) -> Bool
+pub fn Project::text(Self, String) -> String?
+pub fn Project::to_json(Self) -> Json
+pub fn Project::to_json_string(Self) -> String
+
+pub(all) enum ProjectError {
+  DuplicatePath(String)
+  InvalidPath(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct ProjectFile {
+  path : String
+  kind : FileKind
+  text : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct RawDiagnostic {
+  severity : String
+  message : String
+  hints : Array[String]
+  file : String?
+  start_line : Int?
+  start_column : Int?
+  end_line : Int?
+  end_column : Int?
+} derive(Eq, @debug.Debug)
+
+pub(all) struct ThemePlan {
+  body_theme : String?
+  body_classes : Array[(String, Bool)]
+  variables : Array[(String, String)]
+} derive(Eq, @debug.Debug)
+
+pub(all) struct ThemeSettings {
+  theme : String
+  accent : String
+  editor_font_size : String
+  preview_background : String
+  sidebar_width : String
+  compact : Bool
+} derive(Eq, @debug.Debug)
+pub fn ThemeSettings::default() -> Self
 
 // Type aliases
 

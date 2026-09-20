@@ -3,10 +3,12 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseOutline } from "../app/typstbit/web_wasm/outline.js";
+import { loadCore } from "../app/typstbit/web_wasm/core-adapter.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const WASM = process.env.TYPSTBIT_ABI ?? join(ROOT, "rust/target/wasm32-unknown-unknown/release/typst_abi.opt.wasm");
+const CORE_WASM = join(ROOT, "app/typstbit/web_wasm/core.wasm");
+const core = await loadCore(readFileSync(CORE_WASM));
 
 const { instance } = await WebAssembly.instantiate(readFileSync(WASM), {});
 const abi = instance.exports;
@@ -116,7 +118,7 @@ function text(value) {
 
 async function callTool(name, args) {
   if (name === "typst_outline") {
-    return text(parseOutline(args.source ?? ""));
+    return text(core.outline(args.source ?? ""));
   }
   const result = compile(args.source ?? "");
   if (name === "typst_compile") {

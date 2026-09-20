@@ -1,18 +1,15 @@
-// Command-layer regression: catalog integrity, filtering, active state,
-// command dispatch and session transitions, without a browser.
-import {
-  COMMANDS,
-  MENUS,
-  FORMAT_BUTTONS,
-  TOPBAR_ACTIONS,
-  filterCommands,
-  commandActive,
-  commandEnabled,
-  getCommand,
-  runCommand,
-} from "../app/typstbit/web_wasm/commands.js";
+// Command-layer regression: the core catalog/filter/enabled rules plus the
+// host runners and session transitions, without a browser.
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { loadCore } from "../app/typstbit/web_wasm/core-adapter.js";
+import { hasRunner, runCommand } from "../app/typstbit/web_wasm/commands.js";
 import { createSession, STATUS } from "../app/typstbit/web_wasm/session.js";
-import { parseOutline } from "../app/typstbit/web_wasm/outline.js";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const core = await loadCore(readFileSync(join(ROOT, "app/typstbit/web_wasm/core.wasm")));
+const catalog = core.commands();
 
 const failures = [];
 const check = (name, cond, detail = "") => {
@@ -20,49 +17,62 @@ const check = (name, cond, detail = "") => {
   if (!cond) failures.push(name);
 };
 
-const ids = COMMANDS.map(command => command.id);
+const ids = catalog.commands.map(command => command.id);
 check("command ids are unique", new Set(ids).size === ids.length, `${ids.length} commands`);
 check(
-  "every command has label, category and run",
-  COMMANDS.every(command => command.label && command.category && typeof command.run === "function"),
+  "every command has label, category and a runner",
+  catalog.commands.every(command => command.label && command.category) && ids.every(id => hasRunner(id)),
 );
 const referenced = [
-  ...MENUS.flatMap(menu => menu.items.map(item => item.id)),
-  ...FORMAT_BUTTONS.map(item => item.id),
-  ...TOPBAR_ACTIONS.map(item => item.id),
+  ...catalog.menus.flatMap(menu => menu.items.map(item => item.id)),
+  ...catalog.formatButtons.map(item => item.id),
+  ...catalog.topbar.map(item => item.id),
 ];
-check("all UI entries reference known commands", referenced.every(id => getCommand(id) !== null), `${referenced.length} entries`);
-const shortcuts = COMMANDS.map(command => command.shortcut).filter(Boolean);
+check("all UI entries reference known commands", referenced.every(id => ids.includes(id)), `${referenced.length} entries`);
+const shortcuts = catalog.commands.map(command => command.shortcut).filter(Boolean);
 check("shortcuts are unique", new Set(shortcuts).size === shortcuts.length, shortcuts.join(", "));
-check("format bar keeps canonical labels", FORMAT_BUTTONS.some(item => item.label === "加粗") && FORMAT_BUTTONS.some(item => item.label === "⌕ 搜索"));
-check("menus keep canonical labels", MENUS.some(menu => menu.items.some(item => item.label === "恢复示例")) && MENUS.some(menu => menu.items.some(item => item.label === "查找替换 ⌘F")));
+check(
+  "format bar keeps canonical labels",
+  catalog.formatButtons.some(item => item.label === "加粗") && catalog.formatButtons.some(item => item.label === "⌕ 搜索"),
+);
+check(
+  "menus keep canonical labels",
+  catalog.menus.some(menu => menu.items.some(item => item.label === "恢复示例")) &&
+    catalog.menus.some(menu => menu.items.some(item => item.label === "查找替换 ⌘F")),
+);
 
-function makeEditor(doc, from = 0, to = from) {
-  const state = { doc, from, to };
-  return {
-    getDoc: () => state.doc,
-    getSelection: () => ({ from: state.from, to: state.to }),
-    setSelection: (from, to) => { state.from = from; state.to = to; },
-    wrapSelection(before, after = before) {
-      const text = state.doc.slice(state.from, state.to);
-      state.doc = state.doc.slice(0, state.from) + before + text + after + state.doc.slice(state.to);
-      state.from += before.length;
-      state.to = state.from + text.length;
-    },
-    prefixLines(prefix) {
-      const start = state.doc.lastIndexOf("\n", state.from - 1) + 1;
-      state.doc = state.doc.slice(0, start) + prefix + state.doc.slice(start);
-    },
-    insertBlock(text) { state.doc += text; },
-    openSearch() {},
-    clearMarks() {},
-    undo() {},
-    redo() {},
-  };
-}
+const enabledIds = (query, doc, from, to) => core.filterCommands(query, doc, from, to).map(row => row.id);
+const stateOf = (query, doc, from, to) =>
+  Object.fromEntries(core.filterCommands(query, doc, from, to).map(row => [row.id, row.active]));
+
+check("filter by label", enabledIds("加粗", "hello", 0, 5).includes("bold"));
+check("filter by id", enabledIds("bold", "hello", 0, 5).includes("bold"));
+check("filter by category", enabledIds("格式", "", 0, 0).length === 5, `${enabledIds("格式", "", 0, 0).length}`);
+check("empty filter returns enabled commands", enabledIds("", "", 0, 0).length === ids.length - 4, `${enabledIds("", "", 0, 0).length}/${ids.length}`);
+check("no match returns empty", enabledIds("zzz-unknown", "", 0, 0).length === 0);
+check("bold enabled with selection", enabledIds("加粗", "hello", 0, 2).includes("bold"));
+check("bold disabled without selection", !enabledIds("加粗", "hello", 0, 0).includes("bold"));
+check("clear marks disabled on a plain line", !enabledIds("清除", "plain", 0, 0).includes("clear-marks"));
+check("clear marks enabled on a heading line", enabledIds("清除", "= title", 0, 0).includes("clear-marks"));
+check("bold active inside markers", stateOf("加粗", "*hi*", 1, 3).bold === true);
+check("bold inactive outside markers", stateOf("加粗", "*hi*", 0, 4).bold === false);
+check("heading active on prefixed line", stateOf("标题", "= title", 2, 2).heading === true);
+check("unknown command is inert", runCommand("nope", null) === false);
 
 const calls = [];
-const makeCtx = editor => ({
+const editor = {
+  doc: "hello",
+  from: 0,
+  to: 5,
+  getDoc() { return this.doc; },
+  getSelection() { return { from: this.from, to: this.to }; },
+  wrapSelection(before, after = before) {
+    const text = this.doc.slice(this.from, this.to);
+    this.doc = this.doc.slice(0, this.from) + before + text + after + this.doc.slice(this.to);
+  },
+  insertBlock(text) { this.doc += text; },
+};
+const ctx = {
   editor,
   session: createSession(),
   ui: { toast: message => calls.push(`toast:${message}`), openPalette: () => calls.push("palette") },
@@ -75,46 +85,26 @@ const makeCtx = editor => ({
     undo: () => calls.push("undo"),
     redo: () => calls.push("redo"),
   },
-});
-
-check("filter by label", filterCommands("加粗").some(command => command.id === "bold"));
-check("filter by id", filterCommands("bold").some(command => command.id === "bold"));
-check("filter by category", filterCommands("格式").length >= FORMAT_BUTTONS.length - 1);
-check("empty filter returns all", filterCommands("").length === COMMANDS.length);
-check("no match returns empty", filterCommands("zzz-unknown").length === 0);
-
-const boldCtx = makeCtx(makeEditor("*hi*", 1, 3));
-check("bold active inside markers", commandActive("bold", boldCtx) === true);
-boldCtx.editor.setSelection(0, 4);
-check("bold inactive outside markers", commandActive("bold", boldCtx) === false);
-const headingCtx = makeCtx(makeEditor("= title", 2, 2));
-check("heading active on prefixed line", commandActive("heading", headingCtx) === true);
-check("unknown command is inert", runCommand("nope", headingCtx) === false);
-
-const wrapCtx = makeCtx(makeEditor("hello", 0, 5));
-check("bold dispatch wraps selection", runCommand("bold", wrapCtx) === true && wrapCtx.editor.getDoc() === "*hello*", wrapCtx.editor.getDoc());
-check("bold active after wrap", commandActive("bold", wrapCtx) === true);
-const actionCtx = makeCtx(makeEditor(""));
-runCommand("compile-now", actionCtx);
-runCommand("reset-example", actionCtx);
+};
+check("bold dispatch wraps selection", runCommand("bold", ctx) === true && editor.getDoc() === "*hello*", editor.getDoc());
+runCommand("compile-now", ctx);
+runCommand("reset-example", ctx);
 check("dispatch routes through actions", calls.includes("compile") && calls.includes("reset"));
-
-check("bold disabled without selection", commandEnabled("bold", makeCtx(makeEditor("hello", 0, 0))) === false);
-check("bold enabled with selection", commandEnabled("bold", makeCtx(makeEditor("hello", 0, 2))) === true);
-check("clear marks disabled on a plain line", commandEnabled("clear-marks", makeCtx(makeEditor("plain", 0, 0))) === false);
-check("clear marks enabled on a heading line", commandEnabled("clear-marks", makeCtx(makeEditor("= title", 0, 0))) === true);
-check("unknown command stays enabled", commandEnabled("nope", makeCtx(makeEditor(""))) === true);
-const disabledCtx = makeCtx(makeEditor("hello", 0, 0));
-check("disabled command is not dispatched", runCommand("bold", disabledCtx) === false && disabledCtx.editor.getDoc() === "hello");
-
-const quoteCtx = makeCtx(makeEditor("body", 0, 0));
+const quoteCtx = {
+  ...ctx,
+  editor: { ...editor, doc: "body", insertBlock(text) { this.doc += text; } },
+};
 runCommand("quote", quoteCtx);
 check("quote inserts a #quote block", quoteCtx.editor.getDoc().includes("#quote["), quoteCtx.editor.getDoc());
 
-const outline = parseOutline("= A <one>\n\n== B\n\n```\n= NotHeading\n```\n\n=== C");
-check("outline strips labels and tracks levels", outline.map(e => `${e.level}:${e.title}:${e.line}`).join("|") === "1:A:1|2:B:3|3:C:9", JSON.stringify(outline));
-check("outline ignores fenced code", !outline.some(e => e.title === "NotHeading"));
-check("outline of empty source is empty", parseOutline("just text").length === 0);
+const outline = core.outline("= A <one>\n\n== B\n\n```\n= NotHeading\n```\n\n=== C");
+check(
+  "outline strips labels and tracks levels",
+  outline.map(entry => `${entry.level}:${entry.title}:${entry.line}`).join("|") === "1:A:1|2:B:3|3:C:9",
+  JSON.stringify(outline),
+);
+check("outline ignores fenced code", !outline.some(entry => entry.title === "NotHeading"));
+check("outline of plain text is empty", core.outline("just text").length === 0);
 
 const session = createSession({ source: "hi" });
 check("session defaults", session.getState().status === STATUS.IDLE && session.getState().revision === 0);
@@ -129,4 +119,4 @@ check("unsubscribe stops notifications", seen.length === 2);
 check("session state stays single-sourced", session.getState().revision === 2 && session.getState().source === "hi");
 
 console.log(failures.length === 0 ? "COMMANDS: PASS" : `COMMANDS: FAIL (${failures.join(", ")})`);
-process.exit(failures.length === 0 ? 0 : 1);
+process.exit(failures.length ? 1 : 0);
