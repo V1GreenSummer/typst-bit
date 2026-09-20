@@ -120,6 +120,13 @@ const compiled = await waitFor(() => {
 }, 60_000, "initial compile");
 
 check("compile_main end-to-end (initial doc)", compiled >= 1, `compileCount=${compiled}`);
+check(
+  "boot overlay finished after first compile",
+  await page.evaluate(() => {
+    const overlay = document.getElementById("boot-overlay");
+    return !overlay || overlay.classList.contains("done");
+  }),
+);
 
 const status = () => page.evaluate(() => {
   const app = globalThis.__typstbit.app;

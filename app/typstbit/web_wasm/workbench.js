@@ -153,6 +153,66 @@ function el(tag, className, text) {
   return node;
 }
 
+function bootElement(selector) {
+  const overlay = document.getElementById("boot-overlay");
+  return overlay ? overlay.querySelector(selector) : null;
+}
+
+function bootStep(text, ratio) {
+  const overlay = document.getElementById("boot-overlay");
+  if (!overlay) return;
+  const step = overlay.querySelector(".boot-step");
+  if (step) step.textContent = text;
+  const fill = overlay.querySelector(".boot-fill");
+  if (!fill) return;
+  if (typeof ratio === "number") {
+    fill.classList.remove("indeterminate");
+    fill.style.width = `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
+  }
+}
+
+function bootFinish() {
+  const overlay = document.getElementById("boot-overlay");
+  if (!overlay || overlay.classList.contains("done")) return;
+  overlay.classList.add("done");
+  setTimeout(() => overlay.remove(), 350);
+}
+
+function bootFail(message) {
+  const overlay = document.getElementById("boot-overlay");
+  if (!overlay) return;
+  overlay.classList.add("failed");
+  const step = overlay.querySelector(".boot-step");
+  if (step) step.textContent = `加载失败：${message}`;
+}
+
+async function fetchWasmWithProgress(url) {
+  const response = await fetch(url);
+  if (!response.ok || !response.body) return response;
+  const total = Number(response.headers.get("content-length") ?? 0);
+  const encoded = response.headers.get("content-encoding");
+  const determinate = total > 0 && !encoded;
+  const reader = response.body.getReader();
+  const chunks = [];
+  let received = 0;
+  const report = () => {
+    if (determinate) {
+      bootStep(`正在加载编译器 ${Math.round((received / total) * 100)}%（${(received / 1048576).toFixed(1)} MB）`, received / total);
+    } else {
+      bootStep(`正在加载编译器 ${(received / 1048576).toFixed(1)} MB`);
+    }
+  };
+  report();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    report();
+  }
+  return new Response(new Blob(chunks), { status: response.status, statusText: response.statusText, headers: response.headers });
+}
+
 export async function bootWorkbench({ abiWasmUrl, host }) {
   const compat = {
     ready: false, error: null, compileCount: 0,
@@ -160,14 +220,25 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   };
   globalThis.__typstbit = compat;
   let ctx = null;
+  let bootFinished = false;
+  const finishBootOnce = () => {
+    if (bootFinished) return;
+    bootFinished = true;
+    bootFinish();
+  };
 
   let abiUrl = String(abiWasmUrl);
-  let response = await fetch(abiUrl);
+  let response = await fetchWasmWithProgress(abiUrl);
   if (!response.ok && abiUrl.includes("typst_abi.opt.wasm")) {
     abiUrl = abiUrl.replace("typst_abi.opt.wasm", "typst_abi.wasm");
-    response = await fetch(abiUrl);
+    bootStep("正在加载编译器（回退产物）…");
+    response = await fetchWasmWithProgress(abiUrl);
   }
-  if (!response.ok) throw new Error(`fetch typst_abi failed: ${response.status}`);
+  if (!response.ok) {
+    bootFail(`HTTP ${response.status}`);
+    throw new Error(`fetch typst_abi failed: ${response.status}`);
+  }
+  bootStep("初始化编译器…");
   let abi;
   try {
     const streamed = await WebAssembly.instantiateStreaming(response, {});
@@ -179,7 +250,9 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   const bridge = new Abi(abi);
   try { bridge.ex.spike_init?.(); } catch { /* fonts best-effort */ }
 
+  bootStep("准备工作台…");
   const editorMod = await import("./editor-bundle.js");
+  bootStep("初始化编辑器…");
 
   host.innerHTML = "";
   host.id = "app";
@@ -1219,6 +1292,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
           session.update({ status: STATUS.FAILED, diagnostics: [{ severity: "error", message: `包加载失败: ${error}` }] });
           syncEditorDiagnostics();
           setStatusUI();
+          finishBootOnce();
         });
       return;
     }
@@ -1237,6 +1311,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
         session.update({ diagnostics: [{ severity: "error", message: `宿主错误: ${e}` }], status: STATUS.FAILED });
         syncEditorDiagnostics();
         setStatusUI();
+        finishBootOnce();
         return;
       }
       if (revision !== state.revision) return;
@@ -1259,6 +1334,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       }
       syncEditorDiagnostics();
       setStatusUI();
+      finishBootOnce();
     }));
   }
 
@@ -1426,6 +1502,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   renderFiles();
   updateEditorTab();
   setStatusUI();
+  bootStep("首次编译…");
   scheduleCompile();
   return { state, editor, bridge, compat };
 }
