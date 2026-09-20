@@ -3,3 +3,4 @@ app/typstbit/_build/
 app/typstbit/.mooncakes/
 e2e/node_modules/
 node_modules/
+vendor/codemoonbit/_build/
