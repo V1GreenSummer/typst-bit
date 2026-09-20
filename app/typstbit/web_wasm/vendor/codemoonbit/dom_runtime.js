@@ -362,7 +362,7 @@ function createScaffold(container, editorId) {
   input.value = "";
 
   const panel = createEl("div");
-  panel.className = "cm-panel cm-panel-hidden";
+  panel.className = "cm-panel cm-search cm-panel-hidden";
   setStyleValue(panel, "display", "none");
   buildPanel(panel);
 

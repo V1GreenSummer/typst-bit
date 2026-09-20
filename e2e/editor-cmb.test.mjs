@@ -84,6 +84,71 @@ const cursor = await page.evaluate(() => {
 });
 check("facade cursor helpers work", cursor.line === 3 && cursor.pos > 0, JSON.stringify(cursor));
 
+await page.evaluate(() => {
+  const editor = globalThis.__typstbit.editor;
+  editor.setDoc("#let x = 1\n= Title\nSee @intro\n`raw`\n");
+  editor.setSelection(0, 0);
+});
+await page.waitForTimeout(300);
+const tokens = await page.evaluate(() => ({
+  keyword: document.querySelectorAll(".tok-keyword").length,
+  type: document.querySelectorAll(".tok-type").length,
+  tag: document.querySelectorAll(".tok-tag").length,
+  string: document.querySelectorAll(".tok-string").length,
+}));
+check(
+  "typst highlighting renders in CodeMoonBit",
+  tokens.keyword > 0 && tokens.type > 0 && tokens.tag > 0 && tokens.string > 0,
+  JSON.stringify(tokens),
+);
+
+await page.evaluate(() => {
+  const editor = globalThis.__typstbit.editor;
+  editor.setDoc("= A");
+  editor.setSelection(3, 3);
+  editor.focus();
+});
+await page.waitForTimeout(200);
+await page.keyboard.type("(");
+await page.waitForTimeout(200);
+const paired = await page.evaluate(() => {
+  const editor = globalThis.__typstbit.editor;
+  return { doc: editor.getDoc(), selection: editor.getSelection() };
+});
+check("auto-closes brackets", paired.doc === "= A()" && paired.selection.from === 4, JSON.stringify(paired));
+await page.keyboard.type(")");
+await page.waitForTimeout(200);
+const overtyped = await page.evaluate(() => {
+  const editor = globalThis.__typstbit.editor;
+  return { doc: editor.getDoc(), selection: editor.getSelection() };
+});
+check("overtypes closing brackets", overtyped.doc === "= A()" && overtyped.selection.from === 5, JSON.stringify(overtyped));
+
+await page.evaluate(() => {
+  document.body.dataset.theme = "dark";
+});
+await page.waitForTimeout(200);
+check("dark theme propagates to CodeMoonBit", await page.evaluate(() => Boolean(document.querySelector(".cm-theme-dark"))));
+await page.evaluate(() => {
+  document.body.dataset.theme = "light";
+});
+await page.waitForTimeout(200);
+check("light theme propagates to CodeMoonBit", await page.evaluate(() => !document.querySelector(".cm-theme-dark")));
+
+await page.evaluate(() => {
+  const st = globalThis.__typstbit;
+  const id = st.nextTextId++;
+  st.typstTexts.set(id, "= Broken\n\n#let x =");
+  st.app.exports.e2e_set_source(id);
+});
+await waitFor(() => globalThis.__typstbit.app.exports.e2e_status() === 3, "failed compile");
+await page.waitForTimeout(400);
+const marks = await page.evaluate(() => ({
+  error: document.querySelectorAll(".cm-diagnostic-error").length,
+  warning: document.querySelectorAll(".cm-diagnostic-warning").length,
+}));
+check("diagnostics render as editor marks", marks.error + marks.warning > 0, JSON.stringify(marks));
+
 check("no page errors", pageErrors.length === 0, pageErrors.join(" | "));
 
 await browser.close();

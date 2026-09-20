@@ -123,7 +123,10 @@ await page.click('.menubar button:has-text("Edit")');
 await page.click('text=查找替换');
 await page.waitForSelector(".cm-search", { state: "visible", timeout: 5000 });
 await page.keyboard.type("GUI");
-const searchValue = await page.inputValue(".cm-search input[name=search]").catch(() => "");
+const searchValue = await page.evaluate(() => {
+  const input = document.querySelector(".cm-search input[name=search]") || document.querySelector(".cm-search-input");
+  return input ? input.value : "";
+});
 check("search panel open with query", searchValue === "GUI", searchValue);
 await shot("search");
 await page.keyboard.press("Escape");

@@ -12,6 +12,10 @@ function ensureStyles() {
   document.head.append(link);
 }
 
+function workbenchTheme() {
+  return document.body?.dataset?.theme === "dark" ? "dark" : "light";
+}
+
 export async function createEditor(parent, options = {}) {
   ensureStyles();
   const {
@@ -27,10 +31,17 @@ export async function createEditor(parent, options = {}) {
     wasmUrl: WASM_URL,
     lineNumbers: true,
     tabSize: 2,
+    language: "typst",
+    theme: workbenchTheme(),
   });
 
   let applying = false;
   let lastSelection = "";
+
+  const themeObserver = new MutationObserver(() => {
+    handle.setOption("theme", workbenchTheme());
+  });
+  themeObserver.observe(document.body, { attributes: true, attributeFilter: ["data-theme"] });
 
   const selection = () => {
     let raw = null;
@@ -69,6 +80,7 @@ export async function createEditor(parent, options = {}) {
     handle.setDoc(text);
     handle.setSelection(from, to);
     applying = false;
+    handle.focus();
   };
 
   const facade = {
@@ -157,30 +169,80 @@ export async function createEditor(parent, options = {}) {
         replaceDoc(next, caret, caret);
       }
     },
-    setDiagnostics() {},
+    setDiagnostics(list = []) {
+      try {
+        handle.setDiagnostics(JSON.stringify(list));
+      } catch {
+        /* diagnostics are best-effort */
+      }
+    },
     openSearch: () => handle.openSearch(),
     focus: () => handle.focus(),
     undo: () => handle.undo(),
     redo: () => handle.redo(),
-    destroy: () => handle.destroy(),
+    destroy: () => {
+      themeObserver.disconnect();
+      handle.destroy();
+    },
   };
+
+  const PAIRS = { "(": ")", "[": "]", "{": "}", '"': '"', "`": "`" };
+  const CLOSERS = [")", "]", "}", '"', "`"];
+  let composing = false;
+  parent.addEventListener("compositionstart", () => {
+    composing = true;
+  }, true);
+  parent.addEventListener("compositionend", () => {
+    composing = false;
+  }, true);
 
   parent.addEventListener("keydown", event => {
     const mod = event.ctrlKey || event.metaKey;
-    if (!mod) return;
-    const key = event.key.toLowerCase();
-    if (key === "enter") {
+    if (mod) {
+      const key = event.key.toLowerCase();
+      if (key === "enter") {
+        event.preventDefault();
+        onRun();
+      } else if (key === "b") {
+        event.preventDefault();
+        onCommand("bold");
+      } else if (key === "i") {
+        event.preventDefault();
+        onCommand("italic");
+      } else if (key === "u") {
+        event.preventDefault();
+        onCommand("underline");
+      }
+      return;
+    }
+    if (event.altKey || event.isComposing || composing || event.key.length !== 1) return;
+    const closer = PAIRS[event.key];
+    if (closer) {
       event.preventDefault();
-      onRun();
-    } else if (key === "b") {
+      event.stopPropagation();
+      const { from, to } = selection();
+      const doc = handle.getDoc();
+      const selected = doc.slice(from, to);
+      if (selected) {
+        replaceDoc(
+          doc.slice(0, from) + event.key + selected + closer + doc.slice(to),
+          from + 1,
+          to + 1,
+        );
+      } else {
+        replaceDoc(doc.slice(0, from) + event.key + closer + doc.slice(to), from + 1, from + 1);
+      }
+      return;
+    }
+    if (CLOSERS.includes(event.key)) {
+      const { from, to } = selection();
+      if (from !== to) return;
+      const doc = handle.getDoc();
+      if (doc[from] !== event.key) return;
       event.preventDefault();
-      onCommand("bold");
-    } else if (key === "i") {
-      event.preventDefault();
-      onCommand("italic");
-    } else if (key === "u") {
-      event.preventDefault();
-      onCommand("underline");
+      event.stopPropagation();
+      handle.setSelection(from + 1, from + 1);
+      handle.focus();
     }
   }, true);
 

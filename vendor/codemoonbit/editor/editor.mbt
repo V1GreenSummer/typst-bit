@@ -1,4 +1,13 @@
 ///|
+/// A compiler/linter diagnostic rendered as an in-editor mark.
+pub(all) struct Diagnostic {
+  from : Int
+  to : Int
+  severity : String
+  message : String
+}
+
+///|
 /// A high-level editor instance bound to a DOM container.
 pub struct Editor {
   priv view : @view.EditorView
@@ -7,6 +16,7 @@ pub struct Editor {
   priv mut comp_active : Bool
   priv mut comp_from : Int?
   priv mut comp_text : String
+  priv mut diagnostics : Array[Diagnostic]
 }
 
 ///|
@@ -65,6 +75,7 @@ pub fn Editor::create(container : @ffi.JsAny, id : Int) -> Editor {
     comp_active: false,
     comp_from: None,
     comp_text: "",
+    diagnostics: [],
   }
   view.set_decorations_provider(fn(s) { editor.decorations(s) })
   view.set_line_filter(fn(s, line) { is_line_visible(s, line) })
@@ -150,7 +161,22 @@ fn Editor::decorations(
       None => ()
     }
   }
+  for d in self.diagnostics {
+    let cls = if d.severity == "warning" {
+      "cm-diagnostic-warning"
+    } else {
+      "cm-diagnostic-error"
+    }
+    result.push(@view.Decoration::Mark(@core.Range::new(d.from, d.to), cls))
+  }
   result
+}
+
+///|
+/// Replaces the in-editor diagnostic marks and redraws.
+pub fn Editor::set_diagnostics(self : Editor, list : Array[Diagnostic]) -> Unit {
+  self.diagnostics = list
+  self.view.render()
 }
 
 ///|

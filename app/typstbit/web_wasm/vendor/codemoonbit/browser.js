@@ -227,6 +227,9 @@ export async function createEditor(container, options = {}) {
     selectedText() {
       return wasm.cm_selected_text(id);
     },
+    setDiagnostics(json) {
+      wasm.cm_set_diagnostics(id, String(json));
+    },
     setOption(key, value) {
       const encoded = String(value);
       wasm.cm_set_option(id, key, encoded);

@@ -251,9 +251,9 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   try { bridge.ex.spike_init?.(); } catch { /* fonts best-effort */ }
 
   bootStep("准备工作台…");
-  const editorModule = new URLSearchParams(location.search).get("editor") === "cmb"
-    ? "./editor-adapter-cmb.js"
-    : "./editor-bundle.js";
+  const editorModule = new URLSearchParams(location.search).get("editor") === "cm"
+    ? "./editor-bundle.js"
+    : "./editor-adapter-cmb.js";
   const editorMod = await import(editorModule);
   bootStep("初始化编辑器…");
 
@@ -1053,11 +1053,13 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   function syncEditorDiagnostics() {
-    editor.setDiagnostics(state.diagnostics.map(d => ({
-      severity: d.severity, message: d.message + (d.hints?.length ? ` · ${d.hints.join(" ")}` : ""),
-      line: d.start?.line ?? 1, column: d.start?.column ?? 1,
-      endLine: d.end?.line ?? d.start?.line ?? 1, endColumn: d.end?.column ?? (d.start?.column ?? 1) + 1,
-    })));
+    editor.setDiagnostics(state.diagnostics
+      .filter(d => !d.file || d.file === activePath)
+      .map(d => ({
+        severity: d.severity, message: d.message + (d.hints?.length ? ` · ${d.hints.join(" ")}` : ""),
+        line: d.start?.line ?? 1, column: d.start?.column ?? 1,
+        endLine: d.end?.line ?? d.start?.line ?? 1, endColumn: d.end?.column ?? (d.start?.column ?? 1) + 1,
+      })));
   }
 
   function updateEditorTab() {

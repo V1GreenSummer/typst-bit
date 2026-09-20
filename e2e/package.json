@@ -15,7 +15,8 @@
     "cli": "node cli.test.mjs",
     "editor-cmb": "node editor-cmb.test.mjs",
     "fresh-build": "node fresh-build.mjs",
-    "build:workbench": "node build-workbench.mjs"
+    "build:workbench": "node build-workbench.mjs",
+    "interactions:cmb": "EDITOR=cmb node interactions.mjs"
   },
   "keywords": [],
   "author": "",
