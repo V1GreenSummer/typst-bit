@@ -1,13 +1,17 @@
 # Typst.bit MCP 服务器
 
-`tools/typstbit-mcp.mjs` 把与网页端**同一份** `typst_abi.opt.wasm` 暴露为本地 MCP（Model Context Protocol）工具，让大模型可以直接编译、渲染与导出 Typst 文档，无需网络与额外依赖。
+`tools/typstbit-mcp.mjs` 把本地 Typst 编译器暴露为 MCP（Model Context Protocol）工具，让大模型可以直接编译、渲染与导出 Typst 文档，无需网络与额外依赖。默认走 **MoonBit 原生实现**（P4：`native_cli mcp`，直接链接 Rust staticlib）；未构建原生 CLI 时自动回退 Node + `typst_abi.opt.wasm` 实现（`tools/typstbit-mcp-node.mjs`）。
 
 ## 运行要求
 
 - Node.js 18+
-- 已构建的 ABI wasm（仓库默认路径 `rust/target/wasm32-unknown-unknown/release/typst_abi.opt.wasm`，可用环境变量 `TYPSTBIT_ABI` 覆盖）
+- 二选一：
+  - **原生（推荐）**：`tools/build-native-cli.sh`（需要 Rust + MoonBit 工具链）
+  - **Node 回退**：已构建的 ABI wasm（`rust/target/wasm32-unknown-unknown/release/typst_abi.opt.wasm`，可用 `TYPSTBIT_ABI` 覆盖）
 
 ```sh
+tools/build-native-cli.sh        # 原生 CLI/MCP
+# 或
 cd rust && cargo build -p typst-abi --target wasm32-unknown-unknown --release
 ```
 

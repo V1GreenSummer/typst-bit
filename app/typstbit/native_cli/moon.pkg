@@ -1,0 +1,22 @@
+import {
+  "local/typstbit/app",
+  "moonbitlang/core/json",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/encoding/base64",
+  "moonbitlang/x/fs",
+}
+
+supported_targets = "native"
+
+pkgtype(kind: "executable")
+
+options(
+  "native-stub": [ "stub.c" ],
+  link: {
+    "native": {
+      "cc-link-flags": "-L../../rust/target/release -l:libtypst_abi.a -lpthread -ldl -lm",
+    },
+  },
+)

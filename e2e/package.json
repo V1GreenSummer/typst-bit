@@ -15,7 +15,8 @@
     "cli": "node cli.test.mjs",
     "editor-cmb": "node editor-cmb.test.mjs",
     "fresh-build": "node fresh-build.mjs",
-    "core": "node core.test.mjs"
+    "core": "node core.test.mjs",
+    "native-cli": "node native-cli.test.mjs"
   },
   "keywords": [],
   "author": "",

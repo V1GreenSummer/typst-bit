@@ -16,9 +16,12 @@ node vscode-bridge.test.mjs # VSCode 桥：包/编译/PNG/PDF/SVG/诊断映射
 node mcp.test.mjs         # MCP 服务器（5 工具）
 node cli.test.mjs         # 离线 CLI（compile/pdf/png/svg/outline）
 node core.test.mjs        # MoonBit 应用核心（core.wasm）契约与黄金样例
+node native-cli.test.mjs  # 原生 CLI（MoonBit native + Rust staticlib；未构建时 SKIP）
 ```
 
 编辑器修订（2026-09-20，P2）：默认与唯一编辑器为 CodeMoonBit（wasm-gc，`editor-adapter-cmb.js`），CodeMirror 依赖与打包产物已移除；`interactions`/`loader`/`drive-gui`/`commands`/`plugins`/`editor-cmb`/`acceptance`/`browser-matrix`/`fresh-build` 全部在 CodeMoonBit 路径复跑通过。VSCode 扩展补齐工作区 VFS 同步、Problems 诊断与 SVG 导出（`docs/vscode.md`）。
+
+原生修订（2026-09-21，P4）：`rust/typst-abi` 增加 staticlib，MoonBit native CLI/MCP 直接链接（`tools/build-native-cli.sh`，`tools/typstbit-cli` 薄包装，`tools/typstbit-mcp.mjs` 优先原生并回退 Node）；`native-cli.test.mjs` 覆盖 compile/outline/pdf/svg/png 与错误路径。
 
 核心修订（2026-09-21，P1–P3）：应用核心（`app/typstbit/core` → `core.wasm`）默认驱动菜单/工具栏/顶栏结构、命令面板筛选与按钮状态、大纲、包检测与诊断映射；JS 删除 `outline.js` 与包扫描、目录元数据（仅保留执行映射），Node/浏览器共用 `core-adapter.js`，`core.test.mjs` 以冻结黄金样例对拍。
 

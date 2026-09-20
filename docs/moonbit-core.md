@@ -49,8 +49,18 @@
 | **P1 核心扩展** ✅ | 多文件项目、诊断映射、包清单、主题模型（无宿主依赖） | `moon test app` 33/33 |
 | **P2 浏览器接入** ✅ | `core.wasm`（wasm-gc）+ `core-adapter.js`；工作台经核心决定 UI 结构与筛选 | `e2e/core.test.mjs` 对拍一致；interactions 全绿 |
 | **P3 默认切换** ✅ | 核心为默认且唯一；删除 JS 重复实现（outline/包扫描/目录元数据），JS 仅剩执行映射与宿主 | 全部套件在核心路径复跑通过 |
-| **P4 原生核心** | Rust `typst-abi` 增加 native staticlib；MoonBit 原生 CLI/MCP 直接链接，`tools/typstbit-cli.mjs`、`tools/typstbit-mcp.mjs` 由 MoonBit 版替代或薄包装 | CLI/MCP 回归与现有一致；VSCode 可复用同一原生核心 |
+| **P4 原生核心** ✅ | Rust `typst-abi` 增加 `staticlib`；MoonBit native CLI（`native_cli`：compile/pdf/svg/png/outline/mcp）直接链接；`tools/typstbit-cli` 与 `tools/typstbit-mcp.mjs` 为薄包装（MCP 缺 binary 时回退 Node 实现） | `e2e/native-cli.test.mjs` 与 `e2e/mcp.test.mjs` 全绿 |
 | **P5 可选 UI** | 复活 MoUI 画布外壳作为“全 MoonBit UI”形态（复用现有 `web_wasm` 与 `?legacy=1`），与 DOM 工作台二选一 | 独立 e2e 冒烟；不回归 DOM 路径 |
+
+## P4 原生核心（已完成）
+
+- **Rust**：`rust/typst-abi/Cargo.toml` 增加 `staticlib`；`cargo build -p typst-abi --release` 产出 `target/release/libtypst_abi.a`（约 427MB）。
+- **MoonBit native**：`app/typstbit/typst_binding` 增加 native 实现（`ffi_native.mbt` + `stub_native.c`），`app` 包因此可在 native 编译（`supported_targets = "all-js"`）；`app/typstbit/native_cli` 是原生可执行文件：
+  - `compile/pdf/svg/png/outline` 与 JS CLI 对齐（多文件 VFS、包注册、诊断）
+  - `mcp` 子命令实现 stdio JSON-RPC（5 个工具，含 PNG base64 image 块），stdout 每条消息 `fflush`
+  - ABI 契约：输入必须位于 `typst_abi_alloc` arena，C stub 先拷贝再调用
+- **构建/包装**：`tools/build-native-cli.sh`（cargo + `moon build --target native --release`）；`tools/typstbit-cli` 是 sh 薄包装；`tools/typstbit-mcp.mjs` 优先 spawn 原生 MCP，缺 binary 时回退 `tools/typstbit-mcp-node.mjs`
+- **测试**：`e2e/native-cli.test.mjs`（编译/大纲/PDF/SVG/PNG/错误路径）、`e2e/mcp.test.mjs` 经原生路径全绿
 
 ## 风险与对策
 
@@ -62,4 +72,4 @@
 
 ## 一句话
 
-MoonBit 不是、也不需要是 Typst 编译器的实现语言；**“以 MoonBit 为核心”= 应用/领域核心全部在 MoonBit（浏览器与原生同一套），Rust 只做编译器后端，JS 只做宿主与 DOM 绑定。** P0–P3 已完成：应用/领域核心（命令与 UI 结构、筛选、大纲、项目模型、诊断映射、包清单、主题计划）都在 MoonBit，浏览器与 Node 共用同一 `core.wasm`；JS 只剩宿主与副作用。P4（native staticlib + MoonBit CLI/MCP）与 P5（可选 MoUI UI）为后续路线。
+MoonBit 不是、也不需要是 Typst 编译器的实现语言；**“以 MoonBit 为核心”= 应用/领域核心全部在 MoonBit（浏览器与原生同一套），Rust 只做编译器后端，JS 只做宿主与 DOM 绑定。** P0–P4 已完成：应用/领域核心（命令与 UI 结构、筛选、大纲、项目模型、诊断映射、包清单、主题计划）都在 MoonBit，浏览器与 Node 共用同一 `core.wasm`；原生 CLI/MCP 直接链接 Rust 编译器，JS 只剩宿主与副作用。P5（可选 MoUI 画布 UI）为可选路线，与 DOM 工作台二选一。

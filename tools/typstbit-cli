@@ -1,0 +1,12 @@
+#!/bin/sh
+# Thin wrapper around the MoonBit native CLI (P4).
+# Build it with tools/build-native-cli.sh when missing.
+ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+BIN="$ROOT/app/typstbit/_build/native/release/build/native_cli/native_cli.exe"
+if [ ! -x "$BIN" ]; then
+  echo "typstbit: native CLI not built; run tools/build-native-cli.sh" >&2
+  exit 127
+fi
+TYPSTBIT_PACKAGES="${TYPSTBIT_PACKAGES:-$ROOT/app/typstbit/web_wasm/packages}"
+export TYPSTBIT_PACKAGES
+exec "$BIN" "$@"

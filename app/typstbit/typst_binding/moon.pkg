@@ -1,5 +1,19 @@
 import {
   "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
 }
 
-supported_targets = "+wasm-gc +wasm"
+supported_targets = "all-js"
+
+options(
+  "native-stub": [ "stub_native.c" ],
+  link: {
+    "native": {
+      "cc-link-flags": "-L../../rust/target/release -l:libtypst_abi.a -lpthread -ldl -lm",
+    },
+  },
+  targets: {
+    "ffi_wasm.mbt": [ "wasm", "wasm-gc" ],
+    "ffi_native.mbt": [ "native", "llvm" ],
+  },
+)
