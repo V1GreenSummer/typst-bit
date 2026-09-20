@@ -251,10 +251,7 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   try { bridge.ex.spike_init?.(); } catch { /* fonts best-effort */ }
 
   bootStep("准备工作台…");
-  const editorModule = new URLSearchParams(location.search).get("editor") === "cm"
-    ? "./editor-bundle.js"
-    : "./editor-adapter-cmb.js";
-  const editorMod = await import(editorModule);
+  const editorMod = await import("./editor-adapter-cmb.js");
   bootStep("初始化编辑器…");
 
   host.innerHTML = "";

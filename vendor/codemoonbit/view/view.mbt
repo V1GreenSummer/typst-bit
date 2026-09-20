@@ -865,15 +865,16 @@ pub fn EditorView::apply_spec(
 
 ///|
 pub fn EditorView::set_doc(self : EditorView, text : String) -> Unit {
-  self.state = @state.EditorState::create(
-    config=[self.state.extensions()],
-    doc=@core.Text::of(text),
+  let changes = @core.ChangeSet::of(
+    [@core.Change::new(0, self.state.length(), text)],
   )
-  self.highlighter.invalidate(0)
-  self.scroll_top = 0.0
-  self.scroll_left = 0.0
-  self.render()
-  @ffi.notify_update(self.editor_id)
+  let spec = @state.TransactionSpec::new(
+    changes~,
+    selection=@core.EditorSelection::cursor(0),
+    annotations=[@state.UserEvent("setValue")],
+    scroll_into_view=true,
+  )
+  let _ = self.apply_spec(spec)
 }
 
 ///|

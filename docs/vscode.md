@@ -6,14 +6,17 @@
 
 | 形态 | 说明 | 状态 |
 |---|---|---|
-| **A. Node 侧扩展** | 扩展主机里用 `wasm-bridge.js` 编译当前 `.typ`：PNG 预览（Webview 展示）、导出 PDF/SVG、编译诊断；编辑 300ms 防抖刷新 | ✅ PoC 已实现 |
+| **A. Node 侧扩展** | 扩展主机里用 `wasm-bridge.js` 编译当前 `.typ`：PNG 预览（Webview 展示）、导出 PDF/SVG、Problems 诊断、工作区 VFS 同步；编辑/保存/文件变化 300ms 防抖刷新 | ✅ 已实现 |
 | **B. Webview 内嵌完整工作台** | 把 `app/typstbit/web_wasm/` 作为 webview 资源，`index.html?abi=<asWebviewUri>` 覆盖 wasm 地址；多文件/插件/主题全部可用 | 需适配 CSP 与资源 URI（工作量中等） |
 | **C. MCP 配套** | 扩展一键复制 MCP 配置（已内置 `Typst.bit: 复制 MCP 配置`），把编译器接给大模型/其他工具 | ✅ 命令已实现 |
 
 ## PoC 能力（`editors/vscode/`）
 
 - `Typst.bit: 预览当前文件`：编辑器标题栏按钮 + 命令；Webview 显示 1.5x PNG 与诊断列表
-- `Typst.bit: 导出 PDF`：输出同目录同名 PDF
+- `Typst.bit: 导出 PDF` / `Typst.bit: 导出 SVG`：输出同目录同名文件（SVG 为当前页）
+- **工作区同步**：`typstbit.abiPath` 之外，工作区 `.typ`/图片/`.bib`/`.toml` 会写入 ABI VFS；打开的未保存文档覆盖磁盘副本，`#import "lib.typ"` 等多文件项目可用
+- **Problems 面板**：诊断按 `file` 映射到编辑器 URI（`editors/vscode/diagnostics.js`，纯函数、可单测），行/列 1-based → 0-based，写入 `typstbit` DiagnosticCollection
+- **自动重编译**：编辑、保存、工作区文件增删改（FileSystemWatcher）都会触发 300ms 防抖刷新
 - 预置包：自动注册 `assets/packages`（`@preview/tiaoma` 可用）
 - 配置：`typstbit.abiPath`、`typstbit.packagesPath`
 
@@ -34,13 +37,13 @@ cd e2e && node vscode-bridge.test.mjs
 
 ## 缺口与路线图（按优先级）
 
-1. **工作区文件同步**：把 VSCode 工作区的 `.typ` 与图片同步进 VFS（ABI 已支持任意路径 `set_file`；PoC 目前只送当前文件）。
-2. **Problems 面板集成**：诊断 JSON 已有文件/行/列，可写入 `DiagnosticCollection`；跨文件跳转直接可用。
+1. ✅ **工作区文件同步**：工作区 `.typ`/图片/`.bib` 同步进 VFS，未保存文档优先。
+2. ✅ **Problems 面板集成**：`mapDiagnostics` 把诊断映射到编辑器 URI 并写入 `DiagnosticCollection`。
 3. **Webview 完整工作台（形态 B）**：
    - CSP：`default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; script-src 'nonce-…' 'wasm-unsafe-eval'`；
    - 资源：`workbench.js/packages/` 经 `asWebviewUri` 提供，wasm URL 通过 `?abi=` 注入；
    - 外部插件动态 `import(url)` 需放宽 `script-src`（或只允许扩展内插件）。
-4. **命令与任务**：`typstbit.preview/exportPdf` 已就绪，可加 `typstbit.watch`、`typstbit.exportSvg`、格式化/大纲命令，并映射到 VSCode 快捷键。
+4. **命令与任务**：`typstbit.preview/exportPdf/exportSvg` 已就绪并带保存/文件监听自动刷新；可继续加格式化/大纲命令并与浏览器版共享命令目录。
 5. **打包体积**：wasm 38MB 原始 / 4.5MB brotli，建议随扩展以资源文件分发（不走 asar），或首次使用时下载缓存。
 
 ## 快速参考

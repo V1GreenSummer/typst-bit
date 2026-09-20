@@ -325,7 +325,7 @@ check("fix and recover", s.status === 2 && s.errors === 0, JSON.stringify(s));
 // complete in the source (spec "IME 提交" scenario; keyboard.insertText
 // reproduces an IME commit — input event, no keydown). -----------------------
 {
-  // Click into the CodeMirror content to focus the editor.
+  // Click into the editor content to focus it.
   await page.click(".cm-content");
   await page.waitForTimeout(300);
   const cjk = "中文输入法测试——段落文本。";

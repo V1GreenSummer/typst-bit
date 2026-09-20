@@ -64,7 +64,7 @@ api.theme.addStyle(`
 
 ## 稳定选择器（可安全用于主题 CSS）
 
-`.app` `.topbar` `.menubar` `.formatbar` `.workspace-grid` `.sidebar` `.file-list` `.editor-pane` `.preview-pane` `.pdf-frame` `.diagnostics` `.statusbar` `.command-palette` `.outline-panel` `.settings-panel` `.toast`，以及 CodeMirror 的 `.cm-editor` `.cm-gutters` `.cm-activeLine`。
+`.app` `.topbar` `.menubar` `.formatbar` `.workspace-grid` `.sidebar` `.file-list` `.editor-pane` `.preview-pane` `.pdf-frame` `.diagnostics` `.statusbar` `.command-palette` `.outline-panel` `.settings-panel` `.toast`，以及 CodeMoonBit 的 `.cm-editor` `.cm-gutters` `.cm-activeLine`（`.cm-mark`/`.cm-panel` 等同类名）。
 
 ## 内置「主题与布局」插件
 

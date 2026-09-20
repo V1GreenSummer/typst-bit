@@ -116,6 +116,6 @@ api.export.register({
 - `packages.js` + `packages/`：离线 `@preview` 包懒加载。
 - `outline.js`：大纲解析（去标签、跳过代码围栏）。
 - `plugins.js`：插件注册表、设置存储与宿主工厂。
-- `editor-bundle.js`：CodeMirror facade（`workbench-entry.js` 打包产物）。
+- `editor-adapter-cmb.js`：CodeMoonBit 编辑器 facade（与命令层解耦，宿主只依赖该接口）。
 
 以上模块均不依赖工作台 DOM，可被其他项目直接 import 复用。

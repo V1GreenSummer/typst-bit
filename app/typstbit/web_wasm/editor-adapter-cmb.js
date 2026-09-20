@@ -37,6 +37,14 @@ export async function createEditor(parent, options = {}) {
 
   let applying = false;
   let lastSelection = "";
+  let lastDoc = doc;
+
+  const emitChange = () => {
+    const text = handle.getDoc();
+    if (text === lastDoc) return;
+    lastDoc = text;
+    onChange(text);
+  };
 
   const themeObserver = new MutationObserver(() => {
     handle.setOption("theme", workbenchTheme());
@@ -55,15 +63,18 @@ export async function createEditor(parent, options = {}) {
     return { from: Math.min(range.anchor, range.head), to: Math.max(range.anchor, range.head) };
   };
 
-  handle.onUpdate(() => {
-    if (applying) return;
+  const syncSelection = () => {
     const sel = selection();
     const key = `${sel.from}:${sel.to}`;
-    if (key !== lastSelection) {
-      lastSelection = key;
-      onSelectionChange(sel);
-    }
-    onChange(handle.getDoc());
+    if (key === lastSelection) return;
+    lastSelection = key;
+    onSelectionChange(sel);
+  };
+
+  handle.onUpdate(() => {
+    if (applying) return;
+    syncSelection();
+    emitChange();
   });
 
   const lineStarts = () => {
@@ -81,6 +92,8 @@ export async function createEditor(parent, options = {}) {
     handle.setSelection(from, to);
     applying = false;
     handle.focus();
+    syncSelection();
+    emitChange();
   };
 
   const facade = {
@@ -89,6 +102,8 @@ export async function createEditor(parent, options = {}) {
       applying = true;
       handle.setDoc(text);
       applying = false;
+      syncSelection();
+      emitChange();
     },
     getSelection: selection,
     setSelection: (from, to = from) => handle.setSelection(from, to),

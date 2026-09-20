@@ -1,4 +1,4 @@
-// CodeMoonBit editor path smoke test (?editor=cmb).
+// CodeMoonBit editor smoke test (the workbench editor).
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
@@ -49,7 +49,7 @@ const waitFor = async (fn, label, ms = 60000) => {
 };
 const doc = () => page.evaluate(() => globalThis.__typstbit.app.exports.e2e_doc());
 
-await page.goto(`${ORIGIN}/app/typstbit/web_wasm/index.html?editor=cmb`);
+await page.goto(`${ORIGIN}/app/typstbit/web_wasm/index.html`);
 await waitFor(() => globalThis.__typstbit?.ready, "boot");
 await waitFor(() => globalThis.__typstbit.app.exports.e2e_status() === 2, "first compile");
 check("boots with the CodeMoonBit adapter", true);

@@ -9,9 +9,6 @@ import { chromium } from "playwright";
 const ROOT = join(import.meta.dirname, "..");
 const PORT = 8936;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
-const EDITOR = process.env.EDITOR ?? "cmb";
-const EDITOR_QUERY = `?editor=${EDITOR}`;
-const PASTE_TARGET = EDITOR === "cm" ? ".cm-content" : ".cm-input";
 const MIME = {
   ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript",
   ".wasm": "application/wasm", ".json": "application/json", ".css": "text/css",
@@ -67,7 +64,7 @@ const status = () => exports(() => globalThis.__typstbit.app.exports.e2e_status(
 const fmtBtn = text => page.locator(`.formatbar button:text-is("${text}")`);
 const focusEditor = async () => { await page.click(".cm-content"); await page.waitForTimeout(120); };
 
-await page.goto(`${ORIGIN}/app/typstbit/web_wasm/index.html${EDITOR_QUERY}`);
+await page.goto(`${ORIGIN}/app/typstbit/web_wasm/index.html`);
 await waitFor(() => globalThis.__typstbit?.app?.exports?.e2e_status?.() === 2, "boot + first compile");
 
 // --- 1. paste from an external application (browser clipboard -> editor) ------
@@ -464,15 +461,15 @@ check("external plugin command runs", ((await page.locator(".toast").last().text
   const afterUpload = await exports(() => globalThis.__typstbit.app.exports.e2e_project_files());
   check("uploaded image lands in images/", afterUpload.includes("/images/logo.png"), afterUpload.join(","));
 
-  await page.evaluate(async ({ base64, selector }) => {
+  await page.evaluate(async ({ base64 }) => {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const file = new File([bytes], "clip.png", { type: "image/png" });
     const transfer = new DataTransfer();
     transfer.items.add(file);
-    document.querySelector(selector).dispatchEvent(new ClipboardEvent("paste", { clipboardData: transfer, bubbles: true, cancelable: true }));
-  }, { base64: png.toString("base64"), selector: PASTE_TARGET });
+    document.querySelector(".cm-input").dispatchEvent(new ClipboardEvent("paste", { clipboardData: transfer, bubbles: true, cancelable: true }));
+  }, { base64: png.toString("base64") });
   await page.waitForTimeout(500);
   const afterPaste = await exports(() => globalThis.__typstbit.app.exports.e2e_project_files());
   check("pasted image auto-merged into images/", afterPaste.some(path => path.startsWith("/images/paste-")), afterPaste.join(","));
@@ -510,7 +507,7 @@ check("statusbar reports page count", (await page.locator(".statusbar .right").t
 
 // --- 13. share restore --------------------------------------------------------------------
 await page.goto("about:blank");
-await page.goto(clip.replace(/^http:\/\/127\.0\.0\.1:\d+/, ORIGIN).replace(/#/, `${EDITOR_QUERY}#`));
+await page.goto(clip.replace(/^http:\/\/127\.0\.0\.1:\d+/, ORIGIN));
 await waitFor(() => globalThis.__typstbit?.app?.exports?.e2e_status?.() === 2, "shared doc compile");
 check("shared link restores the document", (await doc()).includes("分享测试"), (await doc()).slice(0, 30));
 check("shared hash cleared after load", await page.evaluate(() => location.hash === ""));

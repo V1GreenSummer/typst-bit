@@ -1,8 +1,8 @@
-# CodeMoonBit 接入（替代 CodeMirror）
+# CodeMoonBit 接入（已替代 CodeMirror）
 
-[CodeMoonBit](https://github.com/V1GreenSummer/CodeMoonBit) 是用 MoonBit 实现、编译到 wasm-gc 的 CodeMirror 风格编辑器（Apache-2.0）。本仓库已把它 vendor 进来并接出可切换的编辑器后端，推进“MoonBit 为核心”。
+[CodeMoonBit](https://github.com/V1GreenSummer/CodeMoonBit) 是用 MoonBit 实现、编译到 wasm-gc 的 CodeMirror 风格编辑器（Apache-2.0）。本仓库已把它 vendor 进来作为**唯一编辑器后端**，推进“MoonBit 为核心”。
 
-## 已完成（P0 + P1）
+## 已完成（P0 + P1 + P2）
 
 - **vendor**：源码在 `vendor/codemoonbit/`（含 LICENSE、测试与 CI 配置）
 - **构建脚本**：`tools/build-codemoonbit.sh` — `moon build --target wasm-gc --release` 后把 `main.wasm`（约 201KB）与 `browser.js`/`dom_runtime.js`/`codemoonbit.css` 复制到 `app/typstbit/web_wasm/vendor/codemoonbit/`
@@ -16,32 +16,32 @@
   - 主题跟随 `body[data-theme]`（MutationObserver 同步 `theme` 选项）
   - 自动闭合 `()[]{}""` 与反引号，闭合符可“越过”；组合输入（IME）期间不拦截
   - 命令执行后自动 `focus()`，与 CodeMirror 路径行为一致
-- **切换开关**：默认即 CodeMoonBit；`index.html?editor=cm` 可回退到 CodeMirror（P2 收尾时移除）
-- **工作台解耦**：`workbench.js` 不再访问 CodeMirror 内部（`editor.view`），定位/跳转/光标都走 facade，因此两种编辑器可互换；诊断同步按当前文件过滤后交给编辑器
+- **唯一编辑器**：`workbench.js` 直接加载 `editor-adapter-cmb.js`；CodeMirror 依赖、`editor-bundle.js`/`workbench-entry.js` 与 `e2e/build-workbench.mjs` 已移除
+- **工作台解耦**：`workbench.js` 不访问编辑器内部，定位/跳转/光标都走 facade；诊断同步按当前文件过滤后交给编辑器
 - **测试**：
   - `e2e/editor-cmb.test.mjs`：启动/挂载/set_source 编译/包裹选区/光标助手/Typst 高亮/自动闭合/主题/诊断标记/无报错
-  - `e2e/interactions.mjs` 参数化：`EDITOR=cmb node interactions.mjs` 跑同一套 72 项断言，两条编辑器路径均全绿
-  - 10 套 e2e 默认路径全绿
+  - `e2e/interactions.mjs`：72 项断言全绿（当前唯一的整体交互回归）
+  - 10 套 e2e 全绿
 
 ## 体验方式
 
 ```sh
 node tools/build-codemoonbit.sh          # 需要 moon（本机 wayland shim 不影响它）
-# 打开 app/typstbit/web_wasm/index.html（默认 CodeMoonBit）
-# 回退旧编辑器：app/typstbit/web_wasm/index.html?editor=cm
+# 打开 app/typstbit/web_wasm/index.html（CodeMoonBit）
 ```
 
-## 与 CodeMirror 的差距（替换前需要补）
+## 与 CodeMirror 的能力对照（替换后仍然存在的差距）
 
 | 能力 | 现状 |
 |---|---|
 | Typst 语法高亮 | ✅ P1 已补（`highlight/lang_typst.mbt`） |
 | 诊断标记 | ✅ P1 已补（编辑器内波浪标记 + 底部列表） |
 | 自动闭合括号/引号 | ✅ P1 已在适配器层补（IME 安全） |
-| 搜索面板 | ✅ 有（`.cm-panel.cm-search` 兼容类名），快捷键 `Ctrl-f`；e2e 用可见性断言兼容两者 |
+| 搜索面板 | ✅ 有（`.cm-panel.cm-search` 兼容类名），快捷键 `Ctrl-f` |
 | 主题 | ✅ 跟随 `body[data-theme]`（含暗色），诊断色也定义了明暗变量 |
 | 词级移动（Ctrl/⌘+方向键） | ✅ P1 已补 |
-| 未对齐项 | 折叠 gutter、lint gutter 图标、多光标的部分快捷键、无障碍（视口 HTML 重建）弱于 CodeMirror |
+| 折叠 gutter | ✅ 已有（`cm-fold-foldable`/`cm-fold-folded`，gutter 点击折叠） |
+| 未对齐项 | lint gutter 图标、多光标部分快捷键、无障碍（视口 HTML 重建）弱于 CodeMirror（后续按需补） |
 
 ## 迁移路线
 
@@ -49,7 +49,7 @@ node tools/build-codemoonbit.sh          # 需要 moon（本机 wayland shim 不
 |---|---|---|
 | P0 ✅ | vendor + 构建 + 适配器 + `?editor=cmb` | CMB 冒烟 + 默认路径 10 套全绿 |
 | P1 ✅ | Typst 高亮、诊断标记、自动闭合、词级移动、主题同步；interactions 参数化双跑对拍 | 两条编辑器路径同一套 72 项断言全绿 |
-| P2 🚧 | 默认已切 CodeMoonBit（保留 `?editor=cm` 回退）；下一步移除 `@codemirror/*` 与 `editor-bundle.js` | 依赖/体积下降；回归全绿 |
+| P2 ✅ | 默认切 CodeMoonBit，移除 `@codemirror/*`、`editor-bundle.js`/`workbench-entry.js` 与打包脚本 | 单编辑器路径全绿；依赖/体积下降 |
 | P3 | 与 MoonBit 应用核心（session/commands）合并模块边界（编辑器与命令同源） | 见 `docs/moonbit-core.md` |
 
 ## 说明

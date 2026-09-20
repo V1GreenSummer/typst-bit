@@ -13,13 +13,29 @@
   ],
   "contributes": {
     "commands": [
-      { "command": "typstbit.preview", "title": "Typst.bit: 预览当前文件" },
-      { "command": "typstbit.exportPdf", "title": "Typst.bit: 导出 PDF" },
-      { "command": "typstbit.copyMcpConfig", "title": "Typst.bit: 复制 MCP 配置" }
+      {
+        "command": "typstbit.preview",
+        "title": "Typst.bit: 预览当前文件"
+      },
+      {
+        "command": "typstbit.exportPdf",
+        "title": "Typst.bit: 导出 PDF"
+      },
+      {
+        "command": "typstbit.copyMcpConfig",
+        "title": "Typst.bit: 复制 MCP 配置"
+      },
+      {
+        "command": "typstbit.exportSvg",
+        "title": "Typst.bit: 导出 SVG"
+      }
     ],
     "menus": {
       "editor/title": [
-        { "command": "typstbit.preview", "when": "resourceExtname == .typ" }
+        {
+          "command": "typstbit.preview",
+          "when": "resourceExtname == .typ"
+        }
       ]
     },
     "configuration": {

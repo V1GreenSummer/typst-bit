@@ -41,5 +41,26 @@ abi.compile();
 const diagnostics = abi.diagnostics();
 check("diagnostics surface errors", diagnostics.some(item => item.severity === "error"), `${diagnostics.length} item(s)`);
 
+const { mapDiagnostics } = require(join(ROOT, "editors/vscode/diagnostics.js"));
+const workspaceUri = "file:///work/main.typ";
+const grouped = mapDiagnostics(diagnostics, new Map([["/main.typ", workspaceUri]]), workspaceUri);
+const items = [...grouped.values()].flat();
+check(
+  "diagnostics map onto editor URIs",
+  items.length === diagnostics.length &&
+    items.every(item => Number.isInteger(item.line) && item.line >= 0 && item.endLine >= item.line),
+  JSON.stringify(items[0] ?? null),
+);
+const fallbackItems = mapDiagnostics(
+  [{ severity: "warning", message: "w", start: { line: 3, column: 2 }, end: { line: 3, column: 4 } }],
+  new Map(),
+  workspaceUri,
+).get(workspaceUri);
+check(
+  "diagnostics fall back to the active file and stay 0-based",
+  fallbackItems?.[0]?.line === 2 && fallbackItems[0].endColumn === 3 && fallbackItems[0].severity === "warning",
+  JSON.stringify(fallbackItems?.[0] ?? null),
+);
+
 console.log(failures.length === 0 ? "VSCODE BRIDGE: PASS" : `VSCODE BRIDGE: FAIL (${failures.join(", ")})`);
 process.exit(failures.length === 0 ? 0 : 1);

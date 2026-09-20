@@ -1,12 +1,15 @@
 "use strict";
 const path = require("node:path");
+const fs = require("node:fs");
 const vscode = require("vscode");
 const { TypstAbi } = require("./wasm-bridge");
+const { mapDiagnostics } = require("./diagnostics");
 
 let abiPromise = null;
 let panel = null;
 let debounce = null;
 let currentPage = 0;
+let diagnosticsCollection = null;
 
 function abiPath(context) {
   const configured = vscode.workspace.getConfiguration("typstbit").get("abiPath");
@@ -34,20 +37,96 @@ function isTypst(document) {
   return document.fileName.endsWith(".typ");
 }
 
+function workspaceRoot() {
+  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
+}
+
+function toVfsPath(root, fileName) {
+  if (!root) return null;
+  if (fileName === root) return "/";
+  if (!fileName.startsWith(root + path.sep)) return null;
+  return "/" + path.relative(root, fileName).split(path.sep).join("/");
+}
+
 function activeSource() {
   const editor = vscode.window.activeTextEditor;
   if (!editor || !isTypst(editor.document)) return null;
   return { text: editor.document.getText(), name: editor.document.fileName };
 }
 
+/**
+ * Pushes the workspace files and every open Typst document into the ABI VFS.
+ * Open (possibly unsaved) documents win over their on-disk copies. Returns the
+ * VFS path used as the main file and a VFS-to-URI map for diagnostics.
+ */
+async function syncWorkspace(abi, mainDocument = null) {
+  const root = workspaceRoot();
+  const vfsToUri = new Map();
+  const put = async (vfsPath, uri, bytes) => {
+    if (abi.setFile(vfsPath, bytes) !== 0) return;
+    vfsToUri.set(vfsPath, uri.toString());
+  };
+
+  if (root) {
+    let files = [];
+    try {
+      files = await vscode.workspace.findFiles(
+        "**/*.{typ,svg,png,jpg,jpeg,bib,toml}",
+        "**/node_modules/**",
+        500,
+      );
+    } catch {
+      files = [];
+    }
+    for (const uri of files) {
+      const vfsPath = toVfsPath(root, uri.fsPath);
+      if (!vfsPath) continue;
+      try {
+        await put(vfsPath, uri, await vscode.workspace.fs.readFile(uri));
+      } catch {
+        /* unreadable file: skip */
+      }
+    }
+  }
+
+  const mainVfs = mainDocument ? toVfsPath(root, mainDocument.fileName) : null;
+  for (const document of vscode.workspace.textDocuments) {
+    if (!isTypst(document)) continue;
+    const vfsPath = toVfsPath(root, document.fileName) ?? (document === mainDocument ? "/main.typ" : null);
+    if (!vfsPath) continue;
+    await put(vfsPath, document.uri, Buffer.from(document.getText(), "utf8"));
+  }
+  if (mainDocument && !mainVfs) {
+    await put("/main.typ", mainDocument.uri, Buffer.from(mainDocument.getText(), "utf8"));
+  }
+  abi.setMain(mainVfs ?? "/main.typ");
+  return { vfsToUri, mainVfs: mainVfs ?? "/main.typ" };
+}
+
+function publishDiagnostics(diagnostics, vfsToUri, fallbackUri) {
+  if (!diagnosticsCollection) return;
+  const grouped = mapDiagnostics(diagnostics, vfsToUri, fallbackUri?.toString() ?? null);
+  diagnosticsCollection.clear();
+  for (const [key, items] of grouped) {
+    const uri = vscode.Uri.parse(key);
+    diagnosticsCollection.set(uri, items.map(item => {
+      const range = new vscode.Range(item.line, item.column, item.endLine, item.endColumn);
+      const severity = item.severity === "warning" ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Error;
+      const diagnostic = new vscode.Diagnostic(range, item.message, severity);
+      diagnostic.source = "typstbit";
+      return diagnostic;
+    }));
+  }
+}
+
 async function render(context, abi) {
-  const source = activeSource();
-  if (!source) return null;
-  if (abi.setFile("/main.typ", source.text) !== 0) return null;
-  abi.setMain("/main.typ");
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || !isTypst(editor.document)) return null;
+  const { vfsToUri } = await syncWorkspace(abi, editor.document);
   const status = abi.compile();
   const pages = abi.pageCount();
   const diagnostics = abi.diagnostics();
+  publishDiagnostics(diagnostics, vfsToUri, editor.document.uri);
   const png = status === 0 ? abi.renderPagePng(Math.min(currentPage, Math.max(0, pages - 1)), 1.5) : null;
   return { status, pages, diagnostics, png };
 }
@@ -65,7 +144,7 @@ async function refresh(context) {
     const body = result.png
       ? `<img src="data:image/png;base64,${Buffer.from(result.png).toString("base64")}" />`
       : `<p>编译失败（状态码 ${result.status}）。</p>`;
-    const diag = result.diagnostics.slice(0, 8).map(d => `<li>[${d.severity}] 第 ${d.start?.line ?? "?"} 行 ${escapeHtml(d.message)}</li>`).join("");
+    const diag = result.diagnostics.slice(0, 8).map(d => `<li>[${d.severity}] ${d.file ? `${escapeHtml(d.file)} ` : ""}第 ${d.start?.line ?? "?"} 行 ${escapeHtml(d.message)}</li>`).join("");
     panel.webview.html = pageHtml(body, result.pages, currentPage, diag);
     panel.title = `Typst.bit 预览 · ${result.pages} 页 · ${errors.length} 错误`;
   } catch (error) {
@@ -96,7 +175,35 @@ ${diagnostics ? `<ul>${diagnostics}</ul>` : ""}
 </body></html>`;
 }
 
+async function exportWith(context, kind) {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || !isTypst(editor.document)) {
+    vscode.window.showWarningMessage("Typst.bit: 请在 .typ 文件中使用该命令。");
+    return;
+  }
+  try {
+    const abi = await getAbi(context);
+    const { vfsToUri } = await syncWorkspace(abi, editor.document);
+    if (abi.compile() !== 0) {
+      publishDiagnostics(abi.diagnostics(), vfsToUri, editor.document.uri);
+      vscode.window.showErrorMessage("Typst.bit: 编译失败，未导出。");
+      return;
+    }
+    publishDiagnostics(abi.diagnostics(), vfsToUri, editor.document.uri);
+    const target = editor.document.fileName.replace(/\.typ$/, `.${kind}`);
+    const bytes = kind === "pdf" ? abi.exportPdf() : abi.exportSvg(Math.min(currentPage, Math.max(0, abi.pageCount() - 1)));
+    if (!bytes) return;
+    fs.writeFileSync(target, bytes);
+    vscode.window.showInformationMessage(`Typst.bit: 已导出 ${target}`);
+  } catch (error) {
+    vscode.window.showErrorMessage(`Typst.bit: ${error.message}`);
+  }
+}
+
 function activate(context) {
+  diagnosticsCollection = vscode.languages.createDiagnosticCollection("typstbit");
+  context.subscriptions.push(diagnosticsCollection);
+
   context.subscriptions.push(vscode.commands.registerCommand("typstbit.preview", async () => {
     if (!panel) {
       panel = vscode.window.createWebviewPanel("typstbitPreview", "Typst.bit 预览", vscode.ViewColumn.Beside, { enableScripts: false });
@@ -105,25 +212,8 @@ function activate(context) {
     await refresh(context);
   }));
 
-  context.subscriptions.push(vscode.commands.registerCommand("typstbit.exportPdf", async () => {
-    const source = activeSource();
-    if (!source) {
-      vscode.window.showWarningMessage("Typst.bit: 请在 .typ 文件中使用该命令。");
-      return;
-    }
-    const abi = await getAbi(context);
-    abi.setFile("/main.typ", source.text);
-    abi.setMain("/main.typ");
-    if (abi.compile() !== 0) {
-      vscode.window.showErrorMessage("Typst.bit: 编译失败，未导出。");
-      return;
-    }
-    const bytes = abi.exportPdf();
-    if (!bytes) return;
-    const target = source.name.replace(/\.typ$/, "") + ".pdf";
-    require("node:fs").writeFileSync(target, bytes);
-    vscode.window.showInformationMessage(`Typst.bit: 已导出 ${target}`);
-  }));
+  context.subscriptions.push(vscode.commands.registerCommand("typstbit.exportPdf", () => exportWith(context, "pdf")));
+  context.subscriptions.push(vscode.commands.registerCommand("typstbit.exportSvg", () => exportWith(context, "svg")));
 
   context.subscriptions.push(vscode.commands.registerCommand("typstbit.copyMcpConfig", async () => {
     const abi = path.join(context.extensionPath, "wasm-bridge.js");
@@ -140,12 +230,27 @@ function activate(context) {
     vscode.window.showInformationMessage("Typst.bit: MCP 配置已复制。");
   }));
 
-  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(event => {
+  const recompile = () => {
     if (!panel) return;
-    if (!isTypst(event.document)) return;
     if (debounce) clearTimeout(debounce);
     debounce = setTimeout(() => refresh(context), 300);
+  };
+
+  context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(event => {
+    if (!isTypst(event.document)) return;
+    recompile();
   }));
+
+  context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(document => {
+    if (!isTypst(document)) return;
+    recompile();
+  }));
+
+  const watcher = vscode.workspace.createFileSystemWatcher("**/*.{typ,svg,png,jpg,jpeg,bib}");
+  watcher.onDidChange(recompile);
+  watcher.onDidCreate(recompile);
+  watcher.onDidDelete(recompile);
+  context.subscriptions.push(watcher);
 
   context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => {
     if (panel) refresh(context);
