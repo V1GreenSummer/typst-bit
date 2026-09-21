@@ -8,8 +8,18 @@ export default definePlugin({
       title: "图床设置",
       fields: [
         {
+          key: "pasteTarget",
+          label: "粘贴图片默认保存位置",
+          type: "select",
+          hint: "云端需在上方完成配置；配置不完整或上传失败会自动回退本地，并在界面提示原因。",
+          options: [
+            { value: "cloud", label: "云端图床（阿里云 OSS / 自定义接口）" },
+            { value: "local", label: "本地 images/ 目录" },
+          ],
+        },
+        {
           key: "provider",
-          label: "上传方式",
+          label: "云端上传方式",
           type: "select",
           options: [
             { value: "aliyun-oss", label: "阿里云 OSS（推荐）" },
@@ -23,7 +33,6 @@ export default definePlugin({
         { key: "prefix", label: "对象前缀", type: "text", placeholder: "typstbit/" },
         { key: "customDomain", label: "自定义域名 / CDN（可选）", type: "text", placeholder: "https://cdn.example.com" },
         { key: "token", label: "Bearer 令牌（自定义接口）", type: "password" },
-        { key: "autoUpload", label: "粘贴图片时自动上传（失败回退本地 images/）", type: "boolean" },
       ],
     });
     api.commands.register([

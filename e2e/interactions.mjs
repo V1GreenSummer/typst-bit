@@ -515,6 +515,7 @@ check("shared hash cleared after load", await page.evaluate(() => location.hash 
 // --- 14. image host upload on paste (Aliyun OSS) -------------------------------------------
 await page.evaluate(() => {
   localStorage.setItem("typstbit.plugin.image-host", JSON.stringify({
+    pasteTarget: "cloud",
     provider: "aliyun-oss",
     endpoint: "https://demo-bucket.oss-cn-hangzhou.aliyuncs.com",
     bucket: "demo-bucket",
@@ -522,7 +523,6 @@ await page.evaluate(() => {
     accessKeySecret: "e2e-sk",
     prefix: "typstbit/",
     customDomain: "https://cdn.example.com",
-    autoUpload: true,
   }));
   const original = window.fetch;
   window.__uploadCalls = [];
@@ -591,6 +591,34 @@ check(
   "upload failure falls back to a local image",
   fallback.doc.includes('#image("images/paste-') && fallback.files.some(path => path.startsWith("/images/paste-")),
   fallback.doc.slice(-90),
+);
+// explicit local target wins even with a working cloud configuration
+await page.evaluate(() => {
+  localStorage.setItem("typstbit.plugin.image-host", JSON.stringify({
+    pasteTarget: "local",
+    provider: "aliyun-oss",
+    endpoint: "https://demo-bucket.oss-cn-hangzhou.aliyuncs.com",
+    bucket: "demo-bucket",
+    accessKeyId: "e2e-ak",
+    accessKeySecret: "e2e-sk",
+    prefix: "typstbit/",
+  }));
+  const original = window.fetch;
+  window.__uploadCalls = [];
+  window.fetch = (input, init) => {
+    const url = typeof input === "string" ? input : input?.url ?? "";
+    if (url.startsWith("https://demo-bucket.oss-cn-hangzhou.aliyuncs.com/")) {
+      window.__uploadCalls.push(url);
+      return Promise.resolve(new Response("", { status: 200 }));
+    }
+    return original(input, init);
+  };
+});
+const localTarget = await pasteAndWait("local-target.png");
+check(
+  "paste target local skips the upload",
+  localTarget.calls.length === 0 && localTarget.doc.includes('#image("images/paste-') && localTarget.files.some(path => path.startsWith("/images/paste-")),
+  JSON.stringify({ calls: localTarget.calls.length, tail: localTarget.doc.slice(-60) }),
 );
 await page.evaluate(() => {
   localStorage.removeItem("typstbit.plugin.image-host");

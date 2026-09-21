@@ -1,7 +1,7 @@
 import { createSession, STATUS } from "./session.js";
 import { loadCore } from "./core-adapter.js";
 import { loadPackageManifest, registerPackage } from "./packages.js";
-import { autoUploadReady, uploadImage } from "./image-host.js";
+import { cloudUploadReady, pasteTargetOf, uploadImage } from "./image-host.js";
 import {
   definePlugin,
   getPlugins,
@@ -1254,14 +1254,16 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
 
   async function addPastedImages(files) {
     const host = readSettings("image-host");
-    const ready = autoUploadReady(host);
+    const target = pasteTargetOf(host);
+    const ready = cloudUploadReady(host);
+    const preferCloud = target === "cloud" && ready.ok;
     let uploaded = 0;
     let local = 0;
-    if (host.autoUpload && !ready.ok) {
-      toast(`图床配置不完整（${ready.reason}），改用本地图片`);
+    if (target === "cloud" && !ready.ok) {
+      toast(`云端上传不可用（${ready.reason}），已保存到本地 images/`);
     }
     for (const file of files) {
-      if (ready.ok) {
+      if (preferCloud) {
         try {
           const url = await uploadImage(host, file);
           editor.insertBlock(`#image("${url}")`);

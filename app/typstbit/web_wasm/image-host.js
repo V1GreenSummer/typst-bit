@@ -89,11 +89,20 @@ export function buildPublicUrl(settings, key) {
 }
 
 /**
- * Whether the settings are complete enough for automatic upload.
+ * Where pasted images go by default: "cloud" or "local". The first option
+ * of the settings select ("cloud") is also the default for unset values, so
+ * a fresh install prefers the image host and falls back with a reason when
+ * the host is not configured yet.
+ */
+export function pasteTargetOf(settings = {}) {
+  return settings.pasteTarget === "local" ? "local" : "cloud";
+}
+
+/**
+ * Whether the settings are complete enough for a cloud upload.
  * Returns `{ ok, reason }` so the host can explain why it fell back.
  */
-export function autoUploadReady(settings = {}) {
-  if (!settings.autoUpload) return { ok: false, reason: "未开启自动上传" };
+export function cloudUploadReady(settings = {}) {
   const provider = settings.provider ?? "aliyun-oss";
   if (provider === "aliyun-oss") {
     if (!settings.endpoint) return { ok: false, reason: "未配置 OSS Endpoint" };

@@ -7,7 +7,8 @@ import {
   hmacSha1Base64,
   aliyunStringToSign,
   buildObjectKey,
-  autoUploadReady,
+  cloudUploadReady,
+  pasteTargetOf,
 } from "../app/typstbit/web_wasm/image-host.js";
 import {
   definePlugin,
@@ -189,11 +190,17 @@ check(
 );
 
 check(
-  "provider readiness explains missing settings",
-  autoUploadReady({}).ok === false &&
-    autoUploadReady({ autoUpload: true, provider: "aliyun-oss", endpoint: "https://x", bucket: "b" }).reason === "未配置 AccessKeyId/AccessKeySecret" &&
-    autoUploadReady({ autoUpload: true, provider: "aliyun-oss", endpoint: "https://x", bucket: "b", accessKeyId: "a", accessKeySecret: "s" }).ok === true &&
-    autoUploadReady({ autoUpload: true, provider: "multipart", endpoint: "https://x" }).ok === true,
+  "cloud readiness explains missing settings",
+  cloudUploadReady({ endpoint: "https://x" }).ok === false &&
+    cloudUploadReady({ provider: "aliyun-oss", endpoint: "https://x", bucket: "b" }).reason === "未配置 AccessKeyId/AccessKeySecret" &&
+    cloudUploadReady({ provider: "aliyun-oss", endpoint: "https://x", bucket: "b", accessKeyId: "a", accessKeySecret: "s" }).ok === true &&
+    cloudUploadReady({ provider: "multipart", endpoint: "https://x" }).ok === true,
+);
+check(
+  "paste target defaults to the cloud and honours the local option",
+  pasteTargetOf({}) === "cloud" &&
+    pasteTargetOf({ pasteTarget: "cloud" }) === "cloud" &&
+    pasteTargetOf({ pasteTarget: "local" }) === "local",
 );
 
 let dispatched = null;
