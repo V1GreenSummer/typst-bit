@@ -48,7 +48,7 @@ cd e2e && node commands.test.mjs && node plugins.test.mjs && node cli.test.mjs \
 
 ## 质量与许可
 
-- 字体（Noto CJK / Liberation）均为 SIL OFL 1.1，子集资产随仓库附许可证。
+- 本项目代码为 MIT；字体（Noto CJK / Liberation）均为 SIL OFL 1.1，子集资产随仓库附许可证。
 - 预置包保留原包 LICENSE（tiaoma 为 MIT），vendor 工具记录 tarball sha256。
 - ABI 为单实例、同步、无网络；版本变更需同步更新 `pkg.generated.mbti` 式的 ABI 文档（`docs/embedding.md` 的调用约定）。
 - 体积：wasm 38.34 MiB raw / 13.89 MiB brotli；嵌入方需注意分发与缓存策略。

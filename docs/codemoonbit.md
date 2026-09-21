@@ -1,6 +1,6 @@
 # CodeMoonBit 接入（已替代 CodeMirror）
 
-[CodeMoonBit](https://github.com/V1GreenSummer/CodeMoonBit) 是用 MoonBit 实现、编译到 wasm-gc 的 CodeMirror 风格编辑器（Apache-2.0）。本仓库已把它 vendor 进来作为**唯一编辑器后端**，推进“MoonBit 为核心”。
+[CodeMoonBit](https://github.com/V1GreenSummer/CodeMoonBit) 是用 MoonBit 实现、编译到 wasm-gc 的 CodeMirror 风格编辑器（MIT）。本仓库已把它 vendor 进来作为**唯一编辑器后端**，推进“MoonBit 为核心”。
 
 ## 已完成（P0 + P1 + P2）
 

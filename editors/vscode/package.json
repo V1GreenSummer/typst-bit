@@ -56,5 +56,6 @@
   },
   "scripts": {
     "test": "node ../../e2e/vscode-bridge.test.mjs"
-  }
+  },
+  "license": "MIT"
 }
