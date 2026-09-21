@@ -149,6 +149,27 @@ const marks = await page.evaluate(() => ({
 }));
 check("diagnostics render as editor marks", marks.error + marks.warning > 0, JSON.stringify(marks));
 
+await page.evaluate(() => {
+  const editor = globalThis.__typstbit.editor;
+  editor.setDoc("= IME");
+  editor.setSelection(5, 5);
+  editor.focus();
+});
+await page.waitForTimeout(200);
+const composition = await page.evaluate(() => {
+  const input = document.querySelector(".cm-input");
+  const fire = (type, data) =>
+    input.dispatchEvent(new CompositionEvent(type, { data, bubbles: true, cancelable: true }));
+  fire("compositionstart", "");
+  fire("compositionupdate", "ni");
+  fire("compositionend", "你");
+  fire("compositionstart", "");
+  fire("compositionupdate", "hao");
+  fire("compositionend", "好");
+  return globalThis.__typstbit.editor.getDoc();
+});
+check("consecutive IME commits keep earlier text", composition === "= IME你好", JSON.stringify(composition));
+
 check("no page errors", pageErrors.length === 0, pageErrors.join(" | "));
 
 await browser.close();

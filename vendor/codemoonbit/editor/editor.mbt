@@ -447,8 +447,17 @@ fn Editor::apply_composition_change(
   to : Int,
   text : String,
 ) -> Unit {
+  let cs = @core.ChangeSet::of([@core.Change::new(from, to, text)])
+  let selection = self.state().selection()
+  let ranges : Array[@core.SelectionRange] = []
+  for r in selection.ranges() {
+    ranges.push(
+      @core.SelectionRange::new(cs.map_pos(r.anchor, 1), cs.map_pos(r.head, 1)),
+    )
+  }
   let spec = @state.TransactionSpec::new(
-    changes=@core.ChangeSet::of([@core.Change::new(from, to, text)]),
+    changes=cs,
+    selection=@core.EditorSelection::create(ranges, selection.main_index()),
     annotations=[@state.UserEvent("input.type")],
     scroll_into_view=true,
   )
