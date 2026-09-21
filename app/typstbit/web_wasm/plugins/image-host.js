@@ -1,4 +1,20 @@
 import { definePlugin } from "../plugins.js";
+import { cloudUploadReady, uploadImage } from "../image-host.js";
+
+const TEST_PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+async function testUpload(api) {
+  const settings = api.settings.all();
+  const ready = cloudUploadReady(settings);
+  if (!ready.ok) {
+    api.ui.toast(`图床配置不完整：${ready.reason}`);
+    return;
+  }
+  const bytes = Uint8Array.from(atob(TEST_PIXEL_PNG), c => c.charCodeAt(0));
+  const file = new File([bytes], "typstbit-test.png", { type: "image/png" });
+  const url = await uploadImage(settings, file);
+  api.ui.toast(`图床上传成功：${url}`);
+}
 
 export default definePlugin({
   id: "image-host",
@@ -26,6 +42,16 @@ export default definePlugin({
             { value: "multipart", label: "自定义 multipart 接口" },
           ],
         },
+        {
+          key: "uploadMethod",
+          label: "OSS 传输方式",
+          type: "select",
+          hint: "PUT 返回 405/被跨域拦截时改用表单直传（POST）。",
+          options: [
+            { value: "put", label: "PUT 直传（默认）" },
+            { value: "post", label: "表单直传（POST）" },
+          ],
+        },
         { key: "endpoint", label: "Endpoint / 上传地址", type: "text", placeholder: "https://bucket.oss-cn-hangzhou.aliyuncs.com" },
         { key: "bucket", label: "OSS Bucket（阿里云）", type: "text", placeholder: "my-bucket" },
         { key: "accessKeyId", label: "AccessKeyId（阿里云）", type: "text" },
@@ -36,6 +62,14 @@ export default definePlugin({
       ],
     });
     api.commands.register([
+      {
+        id: "plugin.image-host.test",
+        label: "测试图床上传",
+        category: "插件",
+        run: () => {
+          testUpload(api).catch(error => api.ui.toast(`图床上传失败：${error.message}`));
+        },
+      },
       {
         id: "plugin.image-host.insert",
         label: "插入图床模板",

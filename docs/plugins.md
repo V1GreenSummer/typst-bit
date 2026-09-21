@@ -92,7 +92,7 @@ api.export.register({
 ## 内置示例插件
 
 - **字数统计**（`app/typstbit/web_wasm/plugins/word-count.js`）：注册命令，统计字数/字符/行数。
-- **图床设置**（`plugins/image-host.js`）：新增“粘贴图片默认保存位置”设置，默认 **云端图床**（链接即 OSS/自定义域名 URL），可改为“本地 `images/`”。云端默认 **阿里云 OSS**（PUT + OSS V1 签名，支持自定义域名/CDN；Bucket 需允许站点来源的 CORS PUT），可切换“自定义 multipart 接口”（Bearer 令牌 + 字段 `file`）。上传实现见 `web_wasm/image-host.js`；云端配置不完整或上传失败会自动回退本地并提示原因。
+- **图床设置**（`plugins/image-host.js`）：新增“粘贴图片默认保存位置”设置，默认 **云端图床**（链接即 OSS/自定义域名 URL），可改为“本地 `images/`”。云端默认 **阿里云 OSS**：可选择 **PUT 直传**（V1 签名）或 **表单直传（POST + policy 签名，兼容性更好）**，支持自定义域名/CDN；可切换“自定义 multipart 接口”（Bearer 令牌 + 字段 `file`）。上传实现见 `web_wasm/image-host.js`；云端配置不完整或上传失败会自动回退本地并给出可操作提示（如 405 提示检查 Endpoint 是否为 OSS 域名、改用表单直传、CORS 是否允许 PUT/POST）。插件命令“测试图床上传”可上传一张 1×1 PNG 验证配置。
 - **导出格式**（`plugins/export-formats.js`）：注册 SVG / PNG 导出。
 - **文档模板**（`plugins/templates.js`）：插入封面、双栏文章、幻灯片（16:9）、代码报告模板。
 - **二维码**（`plugins/qrcode.js`）：把选中文本（或默认链接）转成 `@preview/tiaoma` 二维码，自动补 `#import`。

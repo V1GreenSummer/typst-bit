@@ -579,10 +579,44 @@ check(
 check("uploaded image is not stored locally", uploaded.files.length === beforeUpload.length, `${beforeUpload.length} -> ${uploaded.files.length}`);
 
 await page.evaluate(() => {
+  const settings = JSON.parse(localStorage.getItem("typstbit.plugin.image-host"));
+  settings.uploadMethod = "post";
+  localStorage.setItem("typstbit.plugin.image-host", JSON.stringify(settings));
+  const original = window.fetch;
+  window.__uploadCalls = [];
+  window.fetch = (input, init) => {
+    const url = typeof input === "string" ? input : input?.url ?? "";
+    if (url.startsWith("https://demo-bucket.oss-cn-hangzhou.aliyuncs.com")) {
+      const form = init?.body;
+      window.__uploadCalls.push({
+        method: init?.method,
+        key: form?.get?.("key") ?? null,
+        ak: form?.get?.("OSSAccessKeyId") ?? null,
+        signature: form?.get?.("signature") ?? null,
+      });
+      return Promise.resolve(new Response("", { status: 200 }));
+    }
+    return original(input, init);
+  };
+});
+const posted = await pasteAndWait("post.png");
+check(
+  "oss form upload posts a signed policy",
+  posted.calls.length === 1 &&
+    posted.calls[0].method === "POST" &&
+    /^typstbit\//.test(posted.calls[0].key ?? "") &&
+    posted.calls[0].ak === "e2e-ak" &&
+    (posted.calls[0].signature ?? "").length > 20 &&
+    /#image\("https:\/\/cdn\.example\.com\/typstbit\//.test(posted.doc),
+  JSON.stringify({ calls: posted.calls, tail: posted.doc.slice(-60) }),
+);
+
+// upload failure falls back to a local image (kept on the POST path)
+await page.evaluate(() => {
   const original = window.fetch;
   window.fetch = (input, init) => {
     const url = typeof input === "string" ? input : input?.url ?? "";
-    if (url.startsWith("https://demo-bucket.oss-cn-hangzhou.aliyuncs.com/")) return Promise.reject(new Error("network down"));
+    if (url.startsWith("https://demo-bucket.oss-cn-hangzhou.aliyuncs.com")) return Promise.reject(new Error("network down"));
     return original(input, init);
   };
 });

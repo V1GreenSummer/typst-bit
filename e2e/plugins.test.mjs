@@ -9,6 +9,8 @@ import {
   buildObjectKey,
   cloudUploadReady,
   pasteTargetOf,
+  uploadToAliyunOssPost,
+  describeOssError,
 } from "../app/typstbit/web_wasm/image-host.js";
 import {
   definePlugin,

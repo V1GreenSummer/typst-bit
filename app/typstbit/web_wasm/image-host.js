@@ -24,6 +24,33 @@ function trimSlash(url) {
   return String(url ?? "").replace(/\/+$/, "");
 }
 
+/**
+ * Turns an OSS error response into an actionable message (parses the XML
+ * `<Code>`/`<Message>` fields and maps common HTTP statuses to hints).
+ */
+export async function describeOssError(response) {
+  let code = "";
+  let message = "";
+  try {
+    const text = await response.text();
+    code = /<Code>([^<]+)<\/Code>/.exec(text)?.[1] ?? "";
+    message = /<Message>([^<]+)<\/Message>/.exec(text)?.[1] ?? "";
+  } catch {
+    /* ignore body errors */
+  }
+  const base = `OSS HTTP ${response.status}${code ? ` ${code}` : ""}${message ? `：${message}` : ""}`;
+  if (response.status === 405) {
+    return `${base}（PUT 被目标地址拒绝：请确认 Endpoint 是 OSS 访问域名，如 https://<bucket>.oss-cn-<region>.aliyuncs.com，而不是 CDN/自定义域名；或在“云端上传方式”选择“阿里云 OSS 表单直传（POST）”；Bucket 跨域设置的允许 Methods 需包含 PUT/POST）`;
+  }
+  if (response.status === 403) {
+    return `${base}（检查 RAM 是否授予 oss:PutObject、AccessKeyId/Secret 是否属于该 Bucket、Bucket 跨域是否允许本站来源）`;
+  }
+  if (response.status === 400) {
+    return `${base}（检查 Bucket/Endpoint 区域是否一致、对象前缀是否合法）`;
+  }
+  return base;
+}
+
 function encodeKey(key) {
   return key
     .split("/")
@@ -147,14 +174,57 @@ export async function uploadToAliyunOss(
       signal: controller.signal,
     });
     if (!response.ok) {
-      let detail = "";
-      try {
-        const text = await response.text();
-        detail = /<Message>([^<]+)<\/Message>/.exec(text)?.[1] ?? "";
-      } catch {
-        /* ignore body errors */
-      }
-      throw new Error(`OSS HTTP ${response.status}${detail ? `：${detail}` : ""}`);
+      throw new Error(await describeOssError(response));
+    }
+    return buildPublicUrl(settings, key);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Aliyun OSS form upload (PostObject). Works when PUT is blocked (CDN in
+ * front, restrictive CORS) because the form is a simple request signed by a
+ * policy instead of the Authorization header.
+ */
+export async function uploadToAliyunOssPost(
+  settings,
+  file,
+  { fetchImpl = fetch, timeoutMs = 30000, now = new Date(), FormDataImpl = FormData } = {},
+) {
+  const { endpoint, accessKeyId, accessKeySecret } = settings;
+  const prefix = String(settings.prefix ?? "typstbit/").replace(/^\/+/, "");
+  const key = settings.objectKey ?? buildObjectKey(prefix, file, now);
+  const policy = base64Encode(
+    new TextEncoder().encode(
+      JSON.stringify({
+        expiration: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
+        conditions: [
+          ["content-length-range", 0, 32 * 1024 * 1024],
+          ["starts-with", "$key", prefix],
+        ],
+      }),
+    ),
+  );
+  const signature = await hmacSha1Base64(accessKeySecret, policy);
+  const form = new FormDataImpl();
+  form.append("key", key);
+  form.append("policy", policy);
+  form.append("OSSAccessKeyId", accessKeyId);
+  form.append("signature", signature);
+  form.append("success_action_status", "200");
+  if (file.type) form.append("Content-Type", file.type);
+  form.append("file", file, file.name || "image.png");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetchImpl(trimSlash(endpoint), {
+      method: "POST",
+      body: form,
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(await describeOssError(response));
     }
     return buildPublicUrl(settings, key);
   } finally {
@@ -242,6 +312,9 @@ export async function uploadMultipart(
 export function uploadImage(settings, file, overrides = {}) {
   const provider = settings.provider ?? "aliyun-oss";
   if (provider === "aliyun-oss") {
+    if ((settings.uploadMethod ?? "put") === "post") {
+      return uploadToAliyunOssPost(settings, file, overrides);
+    }
     return uploadToAliyunOss(settings, file, overrides);
   }
   return uploadMultipart(settings, file, overrides);

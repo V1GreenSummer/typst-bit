@@ -21,7 +21,7 @@ node native-cli.test.mjs  # 原生 CLI（MoonBit native + Rust staticlib；未�
 
 编辑器修订（2026-09-20，P2）：默认与唯一编辑器为 CodeMoonBit（wasm-gc，`editor-adapter-cmb.js`），CodeMirror 依赖与打包产物已移除；`interactions`/`loader`/`drive-gui`/`commands`/`plugins`/`editor-cmb`/`acceptance`/`browser-matrix`/`fresh-build` 全部在 CodeMoonBit 路径复跑通过。VSCode 扩展补齐工作区 VFS 同步、Problems 诊断与 SVG 导出（`docs/vscode.md`）。
 
-体验修订（2026-09-21）：修复连续中文 IME 提交覆盖上一个字（合成提交的光标映射）；删除字符时因编译后诊断同步重复整稿渲染导致的光标闪烁（诊断列表未变化时跳过重渲染）；图床默认支持阿里云 OSS（PUT + V1 签名 + 自定义域名），新增“粘贴图片默认保存位置”设置（默认云端，文档插入 OSS 链接；失败回退本地并提示）；插件设置面板改为“一插件一卡片”，插件菜单按插件分组加分隔。
+体验修订（2026-09-21）：修复连续中文 IME 提交覆盖上一个字（合成提交的光标映射）；删除字符时因编译后诊断同步重复整稿渲染导致的光标闪烁（诊断列表未变化时跳过重渲染）；图床默认支持阿里云 OSS（PUT + V1 签名 + 自定义域名），新增“粘贴图片默认保存位置”设置（默认云端，文档插入 OSS 链接；失败回退本地并提示）；OSS 支持 PUT 与表单直传（POST）两种方式，405 等错误给出可操作提示，并提供“测试图床上传”命令；插件设置面板改为“一插件一卡片”，插件菜单按插件分组加分隔。
 
 原生修订（2026-09-21，P4）：`rust/typst-abi` 增加 staticlib，MoonBit native CLI/MCP 直接链接（`tools/build-native-cli.sh`，`tools/typstbit-cli` 薄包装，`tools/typstbit-mcp.mjs` 优先原生并回退 Node）；`native-cli.test.mjs` 覆盖 compile/outline/pdf/svg/png 与错误路径。
 
