@@ -193,7 +193,7 @@
 }
 
 .cm-editor:not(.cm-focused) .cm-cursor {
-  display: none;
+  visibility: hidden;
 }
 
 @keyframes cm-blink {

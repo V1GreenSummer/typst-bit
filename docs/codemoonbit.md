@@ -52,6 +52,14 @@ node tools/build-codemoonbit.sh          # 需要 moon（本机 wayland shim 不
 | P2 ✅ | 默认切 CodeMoonBit，移除 `@codemirror/*`、`editor-bundle.js`/`workbench-entry.js` 与打包脚本 | 单编辑器路径全绿；依赖/体积下降 |
 | P3 | 与 MoonBit 应用核心（session/commands）合并模块边界（编辑器与命令同源） | 见 `docs/moonbit-core.md` |
 
+## 性能优化（2026-09-21）
+
+- **行级 HTML 缓存**：`EditorView` 按行缓存 `(签名, JsAny)`，签名含 tokenizer 状态/active/fold/装饰/文本；未变化的行以 `sb_push_js` 单次 FFI 推入（此前每帧整视口逐字符跨边界，约 4–6k 次/帧）。实测每帧仅重建改动行（命中 ≈21/22），内容帧聚合为 22 个字符串推入。
+- **持久光标 overlay**：光标由 JS scaffold 创建一次（`.cm-cursor`），`set_cursor` 仅在变化时写样式；不再随 innerHTML 重建，闪烁动画不重置（修复删除时乱闪）。
+- **渲染去重**：`ensure_cursor_visible` 仅在可见行范围变化时重渲染；滚动跟随不再触发整稿重渲染。
+- **转义批量化**：`push_escaped` 按普通文本段推送，仅对 `& < > "` 逐字符。
+- 基准：`e2e/editor-perf.mjs`（200 行文档、100 键输入/删除；mutation 预算与 p95 20ms 阈值），`npm run editor-perf`。
+
 ## 说明
 
 - CodeMoonBit 是单例 wasm（页面内共享实例），与 `typst_abi` 相互独立；两者由 JS 宿主分别加载。
