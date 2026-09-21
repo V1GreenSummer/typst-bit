@@ -512,27 +512,30 @@ await waitFor(() => globalThis.__typstbit?.app?.exports?.e2e_status?.() === 2, "
 check("shared link restores the document", (await doc()).includes("分享测试"), (await doc()).slice(0, 30));
 check("shared hash cleared after load", await page.evaluate(() => location.hash === ""));
 
-// --- 14. image host upload on paste --------------------------------------------------------
+// --- 14. image host upload on paste (Aliyun OSS) -------------------------------------------
 await page.evaluate(() => {
   localStorage.setItem("typstbit.plugin.image-host", JSON.stringify({
-    endpoint: "https://img.example.com/upload",
-    token: "e2e-token",
+    provider: "aliyun-oss",
+    endpoint: "https://demo-bucket.oss-cn-hangzhou.aliyuncs.com",
+    bucket: "demo-bucket",
+    accessKeyId: "e2e-ak",
+    accessKeySecret: "e2e-sk",
+    prefix: "typstbit/",
+    customDomain: "https://cdn.example.com",
     autoUpload: true,
   }));
   const original = window.fetch;
   window.__uploadCalls = [];
   window.fetch = (input, init) => {
     const url = typeof input === "string" ? input : input?.url ?? "";
-    if (url.startsWith("https://img.example.com/")) {
+    if (url.startsWith("https://demo-bucket.oss-cn-hangzhou.aliyuncs.com/")) {
       window.__uploadCalls.push({
+        url,
         method: init?.method,
         auth: init?.headers?.Authorization,
-        field: init?.body instanceof FormData ? init.body.get("file")?.name ?? null : null,
+        contentType: init?.headers?.["Content-Type"],
       });
-      return Promise.resolve(new Response(
-        JSON.stringify({ data: { url: "https://cdn.example.com/uploaded.png" } }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ));
+      return Promise.resolve(new Response("", { status: 200 }));
     }
     return original(input, init);
   };
@@ -560,25 +563,26 @@ const pasteAndWait = async fileName => {
 const beforeUpload = await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_project_files());
 const uploaded = await pasteAndWait("upload.png");
 check(
-  "pasted image uploads to the image host",
-  uploaded.doc.includes('#image("https://cdn.example.com/uploaded.png")'),
+  "pasted image uploads to Aliyun OSS",
+  /#image\("https:\/\/cdn\.example\.com\/typstbit\/\d{8}-[a-z0-9-]+\.png"\)/.test(uploaded.doc),
   uploaded.doc.slice(-90),
 );
 check(
-  "upload used POST + bearer + multipart field",
+  "oss upload signs a PUT with the expected headers",
   uploaded.calls.length === 1 &&
-    uploaded.calls[0].method === "POST" &&
-    uploaded.calls[0].auth === "Bearer e2e-token" &&
-    uploaded.calls[0].field === "upload.png",
+    uploaded.calls[0].method === "PUT" &&
+    uploaded.calls[0].url.includes("demo-bucket.oss-cn-hangzhou.aliyuncs.com/typstbit/") &&
+    /^OSS e2e-ak:.+=$/.test(uploaded.calls[0].auth) &&
+    uploaded.calls[0].contentType === "image/png",
   JSON.stringify(uploaded.calls),
 );
-check("uploaded image is not stored locally", uploaded.files.length === beforeUpload.length, `${beforeUpload.length} -> ${uploaded.files.length}: ${uploaded.files.join(",")}`);
+check("uploaded image is not stored locally", uploaded.files.length === beforeUpload.length, `${beforeUpload.length} -> ${uploaded.files.length}`);
 
 await page.evaluate(() => {
   const original = window.fetch;
   window.fetch = (input, init) => {
     const url = typeof input === "string" ? input : input?.url ?? "";
-    if (url.startsWith("https://img.example.com/")) return Promise.reject(new Error("network down"));
+    if (url.startsWith("https://demo-bucket.oss-cn-hangzhou.aliyuncs.com/")) return Promise.reject(new Error("network down"));
     return original(input, init);
   };
 });

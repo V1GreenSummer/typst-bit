@@ -1,7 +1,7 @@
 import { createSession, STATUS } from "./session.js";
 import { loadCore } from "./core-adapter.js";
 import { loadPackageManifest, registerPackage } from "./packages.js";
-import { uploadImage } from "./image-host.js";
+import { autoUploadReady, uploadImage } from "./image-host.js";
 import {
   definePlugin,
   getPlugins,
@@ -719,7 +719,10 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   function refreshPluginMenu() {
     if (pluginMenuButton) pluginMenuButton.remove();
     const items = [];
+    let first = true;
     for (const section of pluginSections.values()) {
+      if (!first) items.push({ separator: true });
+      first = false;
       items.push({ header: section.title });
       items.push(...section.items);
     }
@@ -768,7 +771,12 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   const settingsClose = el("button", "button", "关闭");
   const settingsFooter = el("div", "settings-footer");
   settingsFooter.append(el("span", "grow"), settingsSave, settingsClose);
-  settingsPanel.append(el("div", "settings-head", "插件设置"), settingsBody, settingsFooter);
+  const settingsHead = el("div", "settings-head");
+  settingsHead.append(
+    el("div", "settings-title", "插件设置"),
+    el("div", "settings-subtitle", "每个卡片对应一个插件；修改后点“保存”生效"),
+  );
+  settingsPanel.append(settingsHead, settingsBody, settingsFooter);
   document.body.appendChild(settingsPanel);
 
   function openSettings(pluginId = null) {
@@ -784,7 +792,8 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     settingsBody.innerHTML = "";
     if (!pluginId) {
       const external = el("div", "settings-section");
-      external.append(el("div", "settings-title", "外部插件"));
+      external.append(el("div", "settings-section-title", "外部插件"));
+      external.append(el("div", "settings-hint", "从 URL 加载 ES module 插件（默认导出 definePlugin）；移除后刷新页面完全生效。"));
       const urls = readExternalPlugins();
       for (const url of urls) {
         const row = el("div", "settings-row");
@@ -821,11 +830,22 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     }
     for (const entry of entries) {
       const section = el("div", "settings-section");
-      section.append(el("div", "settings-title", entry.schema.title ?? entry.pluginId));
+      const sectionHead = el("div", "settings-section-head");
+      sectionHead.append(
+        el("div", "settings-section-title", entry.schema.title ?? entry.pluginId),
+        el("code", "settings-plugin-id", entry.pluginId),
+      );
+      section.append(sectionHead);
+      if (entry.schema.description) {
+        section.append(el("div", "settings-hint", entry.schema.description));
+      }
       const values = readSettings(entry.pluginId);
       for (const field of entry.schema.fields ?? []) {
         const row = el("label", "settings-row");
-        row.append(el("span", "settings-label", field.label ?? field.key));
+        const label = el("span", "settings-label");
+        label.append(el("span", "settings-label-text", field.label ?? field.key));
+        if (field.hint) label.append(el("span", "settings-hint", field.hint));
+        row.append(label);
         let input;
         if (field.type === "boolean") {
           input = el("input");
@@ -839,12 +859,14 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
             node.value = value;
             input.append(node);
           }
-          input.value = values[field.key] ?? "";
+          const fallback = field.options?.[0]?.value ?? field.options?.[0] ?? "";
+          input.value = values[field.key] ?? fallback;
         } else {
           input = el("input");
           input.type = field.type === "password" ? "password" : "text";
           input.placeholder = field.placeholder ?? "";
-          input.value = values[field.key] ?? "";
+          const fallback = field.options?.[0]?.value ?? field.options?.[0] ?? "";
+          input.value = values[field.key] ?? fallback;
         }
         input.dataset.plugin = entry.pluginId;
         input.dataset.key = field.key;
@@ -1232,13 +1254,16 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
 
   async function addPastedImages(files) {
     const host = readSettings("image-host");
-    const autoUpload = Boolean(host.autoUpload && host.endpoint);
+    const ready = autoUploadReady(host);
     let uploaded = 0;
     let local = 0;
+    if (host.autoUpload && !ready.ok) {
+      toast(`图床配置不完整（${ready.reason}），改用本地图片`);
+    }
     for (const file of files) {
-      if (autoUpload) {
+      if (ready.ok) {
         try {
-          const url = await uploadImage({ endpoint: host.endpoint, token: host.token ?? "", file });
+          const url = await uploadImage(host, file);
           editor.insertBlock(`#image("${url}")`);
           uploaded += 1;
           continue;

@@ -5,7 +5,7 @@ pub(all) struct Diagnostic {
   to : Int
   severity : String
   message : String
-}
+} derive(Debug, Eq)
 
 ///|
 /// A high-level editor instance bound to a DOM container.
@@ -175,6 +175,9 @@ fn Editor::decorations(
 ///|
 /// Replaces the in-editor diagnostic marks and redraws.
 pub fn Editor::set_diagnostics(self : Editor, list : Array[Diagnostic]) -> Unit {
+  if self.diagnostics == list {
+    return
+  }
   self.diagnostics = list
   self.view.render()
 }

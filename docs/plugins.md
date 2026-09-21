@@ -59,7 +59,7 @@ https://v1greensummer.github.io/typst-bit/app/typstbit/web_wasm/index.html?plugi
 
 命令的 `run(ctx)` 收到工作台上下文：`{ editor, session, ui, actions }`。
 
-### 设置表单 schema
+### 设置表单 schema（每个插件一张卡片）
 
 ```js
 api.settings.define({
@@ -92,7 +92,7 @@ api.export.register({
 ## 内置示例插件
 
 - **字数统计**（`app/typstbit/web_wasm/plugins/word-count.js`）：注册命令，统计字数/字符/行数。
-- **图床设置**（`plugins/image-host.js`）：配置上传地址/令牌/粘贴自动上传；上传实现见 `web_wasm/image-host.js`（multipart POST，字段 `file`，可选 `Authorization: Bearer`，兼容 `url`/`data.url`/`link`/`path`/纯文本等响应；失败自动回退本地 `images/`）。
+- **图床设置**（`plugins/image-host.js`）：默认 **阿里云 OSS**（PUT + OSS V1 签名，支持自定义域名/CDN；Bucket 需允许站点来源的 CORS PUT），可切换“自定义 multipart 接口”（Bearer 令牌 + 字段 `file`，兼容 `url`/`data.url`/`link`/`path`/纯文本等响应）。上传实现见 `web_wasm/image-host.js`；粘贴图片自动上传并插入 `#image("https://…")`，配置不完整或上传失败时回退本地 `images/` 并提示原因。
 - **导出格式**（`plugins/export-formats.js`）：注册 SVG / PNG 导出。
 - **文档模板**（`plugins/templates.js`）：插入封面、双栏文章、幻灯片（16:9）、代码报告模板。
 - **二维码**（`plugins/qrcode.js`）：把选中文本（或默认链接）转成 `@preview/tiaoma` 二维码，自动补 `#import`。

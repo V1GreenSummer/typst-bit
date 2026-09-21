@@ -1,5 +1,14 @@
 // Plugin registry, settings store and host API tests (no browser).
-import { extractImageUrl, uploadImage } from "../app/typstbit/web_wasm/image-host.js";
+import {
+  extractImageUrl,
+  uploadImage,
+  uploadMultipart,
+  uploadToAliyunOss,
+  hmacSha1Base64,
+  aliyunStringToSign,
+  buildObjectKey,
+  autoUploadReady,
+} from "../app/typstbit/web_wasm/image-host.js";
 import {
   definePlugin,
   getPlugin,
@@ -66,9 +75,9 @@ check("image host parses nested data.url", extractImageUrl({ data: { url: "https
 check("image host parses link and plain text", extractImageUrl({ data: { link: "https://a/3.png" } }) === "https://a/3.png" && extractImageUrl("https://a/4.png") === "https://a/4.png");
 check("image host rejects unusable responses", extractImageUrl({ ok: true }) === null && extractImageUrl(42) === null && extractImageUrl("not a url") === null);
 
-const uploads = [];
-const uploadFetch = async (url, init) => {
-  uploads.push({ url, method: init.method, auth: init.headers.Authorization, field: init.body.get("file")?.name });
+const multipartCalls = [];
+const multipartFetch = async (url, init) => {
+  multipartCalls.push({ url, method: init.method, auth: init.headers.Authorization, field: init.body.get("file")?.name });
   return { ok: true, status: 200, text: async () => JSON.stringify({ data: { url: "https://cdn.example.com/x.png" } }) };
 };
 class FakeFormData {
@@ -76,48 +85,124 @@ class FakeFormData {
   append(key, value, name) { this.entries.set(key, { value, name }); }
   get(key) { return this.entries.get(key); }
 }
-const fakeFile = { name: "clip.png" };
-const uploadedUrl = await uploadImage({
-  endpoint: "https://img.example.com/upload",
-  token: "tok",
-  file: fakeFile,
-  fetchImpl: uploadFetch,
-  FormDataImpl: FakeFormData,
-});
+const fakeFile = { name: "clip.png", type: "image/png" };
+const multipartUrl = await uploadMultipart(
+  { endpoint: "https://img.example.com/upload", token: "tok" },
+  fakeFile,
+  { fetchImpl: multipartFetch, FormDataImpl: FakeFormData },
+);
 check(
-  "image host uploads multipart with bearer token",
-  uploadedUrl === "https://cdn.example.com/x.png" &&
-    uploads[0].method === "POST" &&
-    uploads[0].auth === "Bearer tok" &&
-    uploads[0].field === "clip.png",
-  JSON.stringify(uploads[0]),
+  "multipart provider posts the file with a bearer token",
+  multipartUrl === "https://cdn.example.com/x.png" &&
+    multipartCalls[0].method === "POST" &&
+    multipartCalls[0].auth === "Bearer tok" &&
+    multipartCalls[0].field === "clip.png",
+  JSON.stringify(multipartCalls[0]),
 );
 
 let failed = false;
 try {
-  await uploadImage({
-    endpoint: "https://img.example.com/upload",
-    file: fakeFile,
+  await uploadMultipart({ endpoint: "https://img.example.com/upload" }, fakeFile, {
     fetchImpl: async () => ({ ok: false, status: 500, text: async () => "" }),
     FormDataImpl: FakeFormData,
   });
 } catch {
   failed = true;
 }
-check("image host rejects HTTP errors", failed);
+check("multipart provider rejects HTTP errors", failed);
 
 failed = false;
 try {
-  await uploadImage({
-    endpoint: "https://img.example.com/upload",
-    file: fakeFile,
+  await uploadMultipart({ endpoint: "https://img.example.com/upload" }, fakeFile, {
     fetchImpl: async () => ({ ok: true, status: 200, text: async () => "{}" }),
     FormDataImpl: FakeFormData,
   });
 } catch {
   failed = true;
 }
-check("image host rejects responses without a url", failed);
+check("multipart provider rejects responses without a url", failed);
+
+check(
+  "hmac-sha1 matches the RFC 2202 vector",
+  (await hmacSha1Base64("key", "The quick brown fox jumps over the lazy dog")) === "3nybhbi3iqa8ino29wqQcBydtNk=",
+);
+check(
+  "aliyun string-to-sign uses the OSS V1 layout",
+  aliyunStringToSign({
+    contentType: "image/png",
+    date: "Tue, 21 Sep 2026 00:00:00 GMT",
+    bucket: "demo-bucket",
+    key: "typstbit/a.png",
+  }) === "PUT\n\nimage/png\nTue, 21 Sep 2026 00:00:00 GMT\n/demo-bucket/typstbit/a.png",
+);
+
+const aliyunCalls = [];
+const aliyunFetch = async (url, init) => {
+  aliyunCalls.push({
+    url,
+    method: init.method,
+    date: init.headers.Date,
+    contentType: init.headers["Content-Type"],
+    auth: init.headers.Authorization,
+    body: init.body,
+  });
+  return { ok: true, status: 200, text: async () => "" };
+};
+const aliyunUrl = await uploadToAliyunOss(
+  {
+    endpoint: "https://demo-bucket.oss-cn-hangzhou.aliyuncs.com",
+    bucket: "demo-bucket",
+    accessKeyId: "ak-test",
+    accessKeySecret: "sk-test",
+    prefix: "typstbit/",
+    customDomain: "https://cdn.example.com",
+    objectKey: "typstbit/fixed.png",
+  },
+  fakeFile,
+  { fetchImpl: aliyunFetch, now: new Date("2026-09-21T00:00:00Z") },
+);
+check(
+  "aliyun provider signs a PUT and returns the custom domain url",
+  aliyunUrl === "https://cdn.example.com/typstbit/fixed.png" &&
+    aliyunCalls[0].method === "PUT" &&
+    aliyunCalls[0].url === "https://demo-bucket.oss-cn-hangzhou.aliyuncs.com/typstbit/fixed.png" &&
+    aliyunCalls[0].contentType === "image/png" &&
+    /^OSS ak-test:.+=$/.test(aliyunCalls[0].auth) &&
+    aliyunCalls[0].body === fakeFile,
+  JSON.stringify({ ...aliyunCalls[0], body: "file" }),
+);
+check(
+  "aliyun signature is hmac-sha1 of the string-to-sign",
+  aliyunCalls[0].auth ===
+    `OSS ak-test:${await hmacSha1Base64("sk-test", aliyunStringToSign({
+      contentType: "image/png",
+      date: aliyunCalls[0].date,
+      bucket: "demo-bucket",
+      key: "typstbit/fixed.png",
+    }))}`,
+);
+
+check(
+  "object keys keep the prefix and extension",
+  /^typstbit\/\d{8}-[a-z0-9]+-[a-z0-9]+\.png$/.test(buildObjectKey("typstbit/", fakeFile, new Date(2026, 8, 21))),
+  buildObjectKey("typstbit/", fakeFile, new Date(2026, 8, 21)),
+);
+
+check(
+  "provider readiness explains missing settings",
+  autoUploadReady({}).ok === false &&
+    autoUploadReady({ autoUpload: true, provider: "aliyun-oss", endpoint: "https://x", bucket: "b" }).reason === "未配置 AccessKeyId/AccessKeySecret" &&
+    autoUploadReady({ autoUpload: true, provider: "aliyun-oss", endpoint: "https://x", bucket: "b", accessKeyId: "a", accessKeySecret: "s" }).ok === true &&
+    autoUploadReady({ autoUpload: true, provider: "multipart", endpoint: "https://x" }).ok === true,
+);
+
+let dispatched = null;
+await uploadImage(
+  { provider: "multipart", endpoint: "https://img.example.com/upload" },
+  fakeFile,
+  { fetchImpl: async (url, init) => { dispatched = { url, auth: init.headers.Authorization }; return { ok: true, status: 200, text: async () => "https://cdn.example.com/y.png" }; }, FormDataImpl: FakeFormData },
+);
+check("uploadImage dispatches to the configured provider", dispatched?.url === "https://img.example.com/upload");
 
 console.log(failures.length === 0 ? "PLUGINS: PASS" : `PLUGINS: FAIL (${failures.join(", ")})`);
 process.exit(failures.length === 0 ? 0 : 1);
