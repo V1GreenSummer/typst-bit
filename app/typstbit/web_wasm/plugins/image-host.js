@@ -52,7 +52,7 @@ export default definePlugin({
             { value: "post", label: "表单直传（POST）" },
           ],
         },
-        { key: "endpoint", label: "Endpoint / 上传地址", type: "text", placeholder: "https://bucket.oss-cn-hangzhou.aliyuncs.com" },
+        { key: "endpoint", label: "Endpoint / 上传地址", type: "text", hint: "支持 oss-cn-beijing / oss-cn-beijing.aliyuncs.com / bucket.oss-cn-beijing（自动补 .aliyuncs.com 与 Bucket 子域）或完整 URL；不要填 CDN/反代域名。", placeholder: "https://bucket.oss-cn-hangzhou.aliyuncs.com" },
         { key: "bucket", label: "OSS Bucket（阿里云）", type: "text", placeholder: "my-bucket" },
         { key: "accessKeyId", label: "AccessKeyId（阿里云）", type: "text" },
         { key: "accessKeySecret", label: "AccessKeySecret（阿里云，仅存本机）", type: "password" },

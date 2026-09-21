@@ -25,10 +25,80 @@ function trimSlash(url) {
 }
 
 /**
+ * Completes Aliyun OSS host shorthands: `oss-cn-beijing`,
+ * `bucket.oss-cn-beijing` and `oss-accelerate` become fully qualified
+ * `*.aliyuncs.com` hosts. Custom domains and full hosts are untouched.
+ */
+function completeAliyunHost(host) {
+  const lower = String(host ?? "").toLowerCase();
+  if (!lower) return lower;
+  if (lower.endsWith(".aliyuncs.com") || lower.endsWith(".aliyuncs.com.cn")) {
+    return lower;
+  }
+  if (/(^|\.)oss-[a-z0-9-]+$/.test(lower)) {
+    return `${lower}.aliyuncs.com`;
+  }
+  return lower;
+}
+
+/**
+ * Parses an endpoint shorthand into a URL (adds https:// and the Aliyun
+ * suffix when needed). Returns `null` when it cannot be parsed.
+ */
+function endpointUrl(endpoint) {
+  let text = trimSlash(String(endpoint ?? "").trim());
+  if (!text) return null;
+  if (!/^https?:\/\//i.test(text)) text = `https://${text}`;
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    return null;
+  }
+  url.hostname = completeAliyunHost(url.hostname);
+  return url;
+}
+
+/**
+ * The base URL actually used for PUT/POST. Accepts the bucket endpoint
+ * (`https://bucket.oss-cn-hangzhou.aliyuncs.com`), the region service
+ * endpoint (`oss-cn-hangzhou`, `oss-cn-hangzhou.aliyuncs.com`; the bucket
+ * is prefixed automatically) or a custom OSS gateway as-is.
+ */
+export function resolveOssBase(settings = {}) {
+  const url = endpointUrl(settings.endpoint);
+  if (!url) return trimSlash(settings.endpoint ?? "");
+  const bucket = String(settings.bucket ?? "").trim();
+  const host = url.hostname;
+  const isServiceEndpoint = /^oss-[a-z0-9-]+\.aliyuncs\.com$/i.test(host);
+  if (bucket && isServiceEndpoint) {
+    url.hostname = `${bucket}.${host}`;
+  }
+  return trimSlash(url.origin + url.pathname);
+}
+
+/**
+ * Validation of the endpoint/bucket pair, used before uploads.
+ */
+export function endpointIssue(settings = {}) {
+  const endpoint = String(settings.endpoint ?? "").trim();
+  if (!endpoint) return "未配置 OSS Endpoint";
+  const url = endpointUrl(endpoint);
+  if (!url) return "Endpoint 不是合法的 URL";
+  const host = url.hostname;
+  const bucket = String(settings.bucket ?? "").trim();
+  const first = host.split(".")[0];
+  if (bucket && /\.oss-[a-z0-9-]+\.aliyuncs\.com$/i.test(host) && first !== bucket) {
+    return `Endpoint 的 Bucket 子域(${first})与 Bucket 配置(${bucket})不一致`;
+  }
+  return "";
+}
+
+/**
  * Turns an OSS error response into an actionable message (parses the XML
  * `<Code>`/`<Message>` fields and maps common HTTP statuses to hints).
  */
-export async function describeOssError(response) {
+export async function describeOssError(response, context = {}) {
   let code = "";
   let message = "";
   try {
@@ -38,7 +108,20 @@ export async function describeOssError(response) {
   } catch {
     /* ignore body errors */
   }
-  const base = `OSS HTTP ${response.status}${code ? ` ${code}` : ""}${message ? `：${message}` : ""}`;
+  let origin = "";
+  try {
+    const requestId = response.headers?.get?.("x-oss-request-id");
+    const server = response.headers?.get?.("server");
+    if (requestId) {
+      origin = `（响应来自 OSS，x-oss-request-id: ${requestId}）`;
+    } else if (server) {
+      origin = `（响应头没有 x-oss-request-id，Server: ${server}；Endpoint 可能不是 OSS 直连，而是 CDN/Nginx/反代）`;
+    }
+  } catch {
+    /* headers not exposed by CORS */
+  }
+  const where = context.method && context.url ? `请求 ${context.method} ${context.url} · ` : "";
+  const base = `${where}OSS HTTP ${response.status}${code ? ` ${code}` : ""}${message ? `：${message}` : ""}${origin}`;
   if (response.status === 405) {
     return `${base}（PUT 被目标地址拒绝：请确认 Endpoint 是 OSS 访问域名，如 https://<bucket>.oss-cn-<region>.aliyuncs.com，而不是 CDN/自定义域名；或在“云端上传方式”选择“阿里云 OSS 表单直传（POST）”；Bucket 跨域设置的允许 Methods 需包含 PUT/POST）`;
   }
@@ -132,7 +215,8 @@ export function pasteTargetOf(settings = {}) {
 export function cloudUploadReady(settings = {}) {
   const provider = settings.provider ?? "aliyun-oss";
   if (provider === "aliyun-oss") {
-    if (!settings.endpoint) return { ok: false, reason: "未配置 OSS Endpoint" };
+    const issue = endpointIssue(settings);
+    if (issue) return { ok: false, reason: issue };
     if (!settings.bucket) return { ok: false, reason: "未配置 Bucket" };
     if (!settings.accessKeyId || !settings.accessKeySecret) {
       return { ok: false, reason: "未配置 AccessKeyId/AccessKeySecret" };
@@ -151,7 +235,8 @@ export async function uploadToAliyunOss(
   file,
   { fetchImpl = fetch, timeoutMs = 30000, now = new Date() } = {},
 ) {
-  const { endpoint, bucket, accessKeyId, accessKeySecret } = settings;
+  const { bucket, accessKeyId, accessKeySecret } = settings;
+  const base = resolveOssBase(settings);
   const contentType = file.type || "application/octet-stream";
   const key = settings.objectKey ?? buildObjectKey(settings.prefix ?? "typstbit/", file, now);
   const date = now.toUTCString();
@@ -159,7 +244,7 @@ export async function uploadToAliyunOss(
     accessKeySecret,
     aliyunStringToSign({ method: "PUT", contentType, date, bucket, key }),
   );
-  const url = `${trimSlash(endpoint)}/${encodeKey(key)}`;
+  const url = `${base}/${encodeKey(key)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -174,9 +259,9 @@ export async function uploadToAliyunOss(
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new Error(await describeOssError(response));
+      throw new Error(await describeOssError(response, { method: "PUT", url }));
     }
-    return buildPublicUrl(settings, key);
+    return buildPublicUrl({ ...settings, endpoint: base }, key);
   } finally {
     clearTimeout(timer);
   }
@@ -192,7 +277,8 @@ export async function uploadToAliyunOssPost(
   file,
   { fetchImpl = fetch, timeoutMs = 30000, now = new Date(), FormDataImpl = FormData } = {},
 ) {
-  const { endpoint, accessKeyId, accessKeySecret } = settings;
+  const { accessKeyId, accessKeySecret } = settings;
+  const base = resolveOssBase(settings);
   const prefix = String(settings.prefix ?? "typstbit/").replace(/^\/+/, "");
   const key = settings.objectKey ?? buildObjectKey(prefix, file, now);
   const policy = base64Encode(
@@ -218,15 +304,15 @@ export async function uploadToAliyunOssPost(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetchImpl(trimSlash(endpoint), {
+    const response = await fetchImpl(base, {
       method: "POST",
       body: form,
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new Error(await describeOssError(response));
+      throw new Error(await describeOssError(response, { method: "PUT", url }));
     }
-    return buildPublicUrl(settings, key);
+    return buildPublicUrl({ ...settings, endpoint: base }, key);
   } finally {
     clearTimeout(timer);
   }

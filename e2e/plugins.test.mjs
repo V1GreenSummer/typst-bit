@@ -11,6 +11,8 @@ import {
   pasteTargetOf,
   uploadToAliyunOssPost,
   describeOssError,
+  resolveOssBase,
+  endpointIssue,
 } from "../app/typstbit/web_wasm/image-host.js";
 import {
   definePlugin,
@@ -189,6 +191,44 @@ check(
   "object keys keep the prefix and extension",
   /^typstbit\/\d{8}-[a-z0-9]+-[a-z0-9]+\.png$/.test(buildObjectKey("typstbit/", fakeFile, new Date(2026, 8, 21))),
   buildObjectKey("typstbit/", fakeFile, new Date(2026, 8, 21)),
+);
+
+check(
+  "oss base accepts region and bucket shorthands",
+  resolveOssBase({ endpoint: "oss-cn-beijing", bucket: "demo" }) === "https://demo.oss-cn-beijing.aliyuncs.com" &&
+    resolveOssBase({ endpoint: "oss-cn-beijing.aliyuncs.com", bucket: "demo" }) === "https://demo.oss-cn-beijing.aliyuncs.com" &&
+    resolveOssBase({ endpoint: "demo.oss-cn-beijing", bucket: "demo" }) === "https://demo.oss-cn-beijing.aliyuncs.com" &&
+    resolveOssBase({ endpoint: "Demo.Oss-Cn-Beijing", bucket: "demo" }) === "https://demo.oss-cn-beijing.aliyuncs.com" &&
+    resolveOssBase({ endpoint: "oss-accelerate", bucket: "demo" }) === "https://demo.oss-accelerate.aliyuncs.com" &&
+    resolveOssBase({ endpoint: "https://demo.oss-cn-hangzhou.aliyuncs.com/", bucket: "demo" }) === "https://demo.oss-cn-hangzhou.aliyuncs.com" &&
+    resolveOssBase({ endpoint: "https://upload.example.com", bucket: "demo" }) === "https://upload.example.com" &&
+    resolveOssBase({ endpoint: "http://127.0.0.1:9000", bucket: "demo" }) === "http://127.0.0.1:9000",
+  JSON.stringify(resolveOssBase({ endpoint: "oss-cn-beijing", bucket: "demo" })),
+);
+check(
+  "endpoint issues are reported before uploading",
+  endpointIssue({ endpoint: "https://other.oss-cn-hangzhou.aliyuncs.com", bucket: "demo" }).includes("不一致") &&
+    endpointIssue({ endpoint: "oss-cn-beijing", bucket: "demo" }) === "" &&
+    endpointIssue({ endpoint: "https://oss-cn-hangzhou.aliyuncs.com", bucket: "demo" }) === "" &&
+    endpointIssue({ endpoint: "https://upload.example.com", bucket: "demo" }) === "",
+);
+const contextError = await describeOssError(
+  { status: 405, headers: { get: name => (name === "x-oss-request-id" ? "RID123" : null) }, text: async () => "" },
+  { method: "PUT", url: "https://demo.oss-cn-hangzhou.aliyuncs.com/typstbit/x.png" },
+);
+check(
+  "error context names the request and recognises OSS responses",
+  contextError.includes("PUT https://demo.oss-cn-hangzhou.aliyuncs.com/typstbit/x.png") && contextError.includes("x-oss-request-id: RID123"),
+  contextError,
+);
+const proxyError = await describeOssError(
+  { status: 405, headers: { get: name => (name === "server" ? "nginx" : null) }, text: async () => "" },
+  { method: "PUT", url: "https://img.example.com/x.png" },
+);
+check(
+  "non-OSS proxies are called out in error messages",
+  proxyError.includes("nginx") && proxyError.includes("CDN/Nginx/反代"),
+  proxyError,
 );
 
 check(

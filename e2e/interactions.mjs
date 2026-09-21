@@ -517,7 +517,7 @@ await page.evaluate(() => {
   localStorage.setItem("typstbit.plugin.image-host", JSON.stringify({
     pasteTarget: "cloud",
     provider: "aliyun-oss",
-    endpoint: "https://demo-bucket.oss-cn-hangzhou.aliyuncs.com",
+    endpoint: "oss-cn-hangzhou",
     bucket: "demo-bucket",
     accessKeyId: "e2e-ak",
     accessKeySecret: "e2e-sk",
@@ -631,7 +631,7 @@ await page.evaluate(() => {
   localStorage.setItem("typstbit.plugin.image-host", JSON.stringify({
     pasteTarget: "local",
     provider: "aliyun-oss",
-    endpoint: "https://demo-bucket.oss-cn-hangzhou.aliyuncs.com",
+    endpoint: "oss-cn-hangzhou",
     bucket: "demo-bucket",
     accessKeyId: "e2e-ak",
     accessKeySecret: "e2e-sk",
