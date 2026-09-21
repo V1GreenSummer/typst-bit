@@ -1,5 +1,5 @@
 import {
-  "local/typstbit/typst_binding",
+  "V1GreenSummer/typstbit/typst_binding",
   "moonbitlang/core/json",
   "moonbitlang/core/string",
 }

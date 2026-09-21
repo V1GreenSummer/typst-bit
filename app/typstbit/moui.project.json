@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "typstbit",
   "title": "Typstbit",
-  "module": "local/typstbit",
+  "module": "V1GreenSummer/typstbit",
   "mouiVersion": "0.1.9",
   "platforms": [
     "web",

@@ -1,5 +1,5 @@
 import {
-  "local/typstbit/app",
+  "V1GreenSummer/typstbit/app",
   "moonbitlang/core/json",
   "moonbitlang/core/env",
   "moonbitlang/core/string",
