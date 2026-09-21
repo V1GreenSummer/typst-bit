@@ -1,6 +1,7 @@
 import { createSession, STATUS } from "./session.js";
 import { loadCore } from "./core-adapter.js";
 import { loadPackageManifest, registerPackage } from "./packages.js";
+import { uploadImage } from "./image-host.js";
 import {
   definePlugin,
   getPlugins,
@@ -1230,7 +1231,21 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   async function addPastedImages(files) {
+    const host = readSettings("image-host");
+    const autoUpload = Boolean(host.autoUpload && host.endpoint);
+    let uploaded = 0;
+    let local = 0;
     for (const file of files) {
+      if (autoUpload) {
+        try {
+          const url = await uploadImage({ endpoint: host.endpoint, token: host.token ?? "", file });
+          editor.insertBlock(`#image("${url}")`);
+          uploaded += 1;
+          continue;
+        } catch (error) {
+          toast(`图床上传失败，改用本地图片：${error.message}`);
+        }
+      }
       const bytes = new Uint8Array(await file.arrayBuffer());
       const ext = file.type === "image/jpeg" ? "jpg"
         : file.type === "image/svg+xml" ? "svg"
@@ -1239,11 +1254,13 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
       project.set(`/images/${name}`, { kind: "binary", bytes });
       folders.add("/images");
       editor.insertBlock(`#image("images/${name}")`);
+      local += 1;
     }
     saveProject();
     renderFiles();
     scheduleCompile();
-    toast(`已粘贴 ${files.length} 张图片到 images/`);
+    if (uploaded > 0) toast(`已上传 ${uploaded} 张图片到图床`);
+    if (local > 0) toast(`已粘贴 ${local} 张图片到 images/`);
   }
 
   function projectMainText() {

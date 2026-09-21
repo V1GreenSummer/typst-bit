@@ -1,4 +1,5 @@
 // Plugin registry, settings store and host API tests (no browser).
+import { extractImageUrl, uploadImage } from "../app/typstbit/web_wasm/image-host.js";
 import {
   definePlugin,
   getPlugin,
@@ -59,6 +60,64 @@ check("host delegates exporters", calls.some(call => call[0] === "export" && cal
 check("host delegates settings dialog", calls.some(call => call[0] === "settings" && call[1] === "demo"));
 check("host settings set/get round trip", host.settings.get("token") === "secret");
 check("host delegates toast", calls.some(call => call[0] === "toast" && call[1] === "hi"));
+
+check("image host parses url fields", extractImageUrl({ url: "https://a/1.png" }) === "https://a/1.png");
+check("image host parses nested data.url", extractImageUrl({ data: { url: "https://a/2.png" } }) === "https://a/2.png");
+check("image host parses link and plain text", extractImageUrl({ data: { link: "https://a/3.png" } }) === "https://a/3.png" && extractImageUrl("https://a/4.png") === "https://a/4.png");
+check("image host rejects unusable responses", extractImageUrl({ ok: true }) === null && extractImageUrl(42) === null && extractImageUrl("not a url") === null);
+
+const uploads = [];
+const uploadFetch = async (url, init) => {
+  uploads.push({ url, method: init.method, auth: init.headers.Authorization, field: init.body.get("file")?.name });
+  return { ok: true, status: 200, text: async () => JSON.stringify({ data: { url: "https://cdn.example.com/x.png" } }) };
+};
+class FakeFormData {
+  constructor() { this.entries = new Map(); }
+  append(key, value, name) { this.entries.set(key, { value, name }); }
+  get(key) { return this.entries.get(key); }
+}
+const fakeFile = { name: "clip.png" };
+const uploadedUrl = await uploadImage({
+  endpoint: "https://img.example.com/upload",
+  token: "tok",
+  file: fakeFile,
+  fetchImpl: uploadFetch,
+  FormDataImpl: FakeFormData,
+});
+check(
+  "image host uploads multipart with bearer token",
+  uploadedUrl === "https://cdn.example.com/x.png" &&
+    uploads[0].method === "POST" &&
+    uploads[0].auth === "Bearer tok" &&
+    uploads[0].field === "clip.png",
+  JSON.stringify(uploads[0]),
+);
+
+let failed = false;
+try {
+  await uploadImage({
+    endpoint: "https://img.example.com/upload",
+    file: fakeFile,
+    fetchImpl: async () => ({ ok: false, status: 500, text: async () => "" }),
+    FormDataImpl: FakeFormData,
+  });
+} catch {
+  failed = true;
+}
+check("image host rejects HTTP errors", failed);
+
+failed = false;
+try {
+  await uploadImage({
+    endpoint: "https://img.example.com/upload",
+    file: fakeFile,
+    fetchImpl: async () => ({ ok: true, status: 200, text: async () => "{}" }),
+    FormDataImpl: FakeFormData,
+  });
+} catch {
+  failed = true;
+}
+check("image host rejects responses without a url", failed);
 
 console.log(failures.length === 0 ? "PLUGINS: PASS" : `PLUGINS: FAIL (${failures.join(", ")})`);
 process.exit(failures.length === 0 ? 0 : 1);

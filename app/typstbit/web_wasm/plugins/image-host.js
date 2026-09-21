@@ -7,9 +7,9 @@ export default definePlugin({
     api.settings.define({
       title: "图床设置",
       fields: [
-        { key: "endpoint", label: "上传地址", type: "text", placeholder: "https://example.com/upload" },
-        { key: "token", label: "访问令牌", type: "password" },
-        { key: "autoUpload", label: "粘贴图片时自动上传", type: "boolean" },
+        { key: "endpoint", label: "上传地址（POST multipart，文件字段 file）", type: "text", placeholder: "https://example.com/upload" },
+        { key: "token", label: "访问令牌（Authorization: Bearer）", type: "password" },
+        { key: "autoUpload", label: "粘贴图片时自动上传（失败回退本地 images/）", type: "boolean" },
       ],
     });
     api.commands.register([

@@ -512,6 +512,86 @@ await waitFor(() => globalThis.__typstbit?.app?.exports?.e2e_status?.() === 2, "
 check("shared link restores the document", (await doc()).includes("分享测试"), (await doc()).slice(0, 30));
 check("shared hash cleared after load", await page.evaluate(() => location.hash === ""));
 
+// --- 14. image host upload on paste --------------------------------------------------------
+await page.evaluate(() => {
+  localStorage.setItem("typstbit.plugin.image-host", JSON.stringify({
+    endpoint: "https://img.example.com/upload",
+    token: "e2e-token",
+    autoUpload: true,
+  }));
+  const original = window.fetch;
+  window.__uploadCalls = [];
+  window.fetch = (input, init) => {
+    const url = typeof input === "string" ? input : input?.url ?? "";
+    if (url.startsWith("https://img.example.com/")) {
+      window.__uploadCalls.push({
+        method: init?.method,
+        auth: init?.headers?.Authorization,
+        field: init?.body instanceof FormData ? init.body.get("file")?.name ?? null : null,
+      });
+      return Promise.resolve(new Response(
+        JSON.stringify({ data: { url: "https://cdn.example.com/uploaded.png" } }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ));
+    }
+    return original(input, init);
+  };
+});
+const pasteAndWait = async fileName => {
+  await page.evaluate(async name => {
+    const bytes = Uint8Array.from(
+      atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="),
+      c => c.charCodeAt(0),
+    );
+    const file = new File([bytes], name, { type: "image/png" });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    document.querySelector(".cm-input").dispatchEvent(new ClipboardEvent("paste", {
+      clipboardData: transfer, bubbles: true, cancelable: true,
+    }));
+  }, fileName);
+  await page.waitForTimeout(700);
+  return page.evaluate(() => ({
+    doc: globalThis.__typstbit.editor.getDoc(),
+    files: globalThis.__typstbit.app.exports.e2e_project_files(),
+    calls: window.__uploadCalls ?? [],
+  }));
+};
+const beforeUpload = await page.evaluate(() => globalThis.__typstbit.app.exports.e2e_project_files());
+const uploaded = await pasteAndWait("upload.png");
+check(
+  "pasted image uploads to the image host",
+  uploaded.doc.includes('#image("https://cdn.example.com/uploaded.png")'),
+  uploaded.doc.slice(-90),
+);
+check(
+  "upload used POST + bearer + multipart field",
+  uploaded.calls.length === 1 &&
+    uploaded.calls[0].method === "POST" &&
+    uploaded.calls[0].auth === "Bearer e2e-token" &&
+    uploaded.calls[0].field === "upload.png",
+  JSON.stringify(uploaded.calls),
+);
+check("uploaded image is not stored locally", uploaded.files.length === beforeUpload.length, `${beforeUpload.length} -> ${uploaded.files.length}: ${uploaded.files.join(",")}`);
+
+await page.evaluate(() => {
+  const original = window.fetch;
+  window.fetch = (input, init) => {
+    const url = typeof input === "string" ? input : input?.url ?? "";
+    if (url.startsWith("https://img.example.com/")) return Promise.reject(new Error("network down"));
+    return original(input, init);
+  };
+});
+const fallback = await pasteAndWait("fallback.png");
+check(
+  "upload failure falls back to a local image",
+  fallback.doc.includes('#image("images/paste-') && fallback.files.some(path => path.startsWith("/images/paste-")),
+  fallback.doc.slice(-90),
+);
+await page.evaluate(() => {
+  localStorage.removeItem("typstbit.plugin.image-host");
+});
+
 check("no page errors during interactions", pageErrors.length === 0, pageErrors.slice(0, 3).join(" | "));
 
 console.log(failures.length === 0 ? "INTERACTIONS: PASS" : `INTERACTIONS: FAIL (${failures.join(", ")})`);
