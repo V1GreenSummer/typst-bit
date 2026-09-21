@@ -38,6 +38,19 @@ check("bundled @preview package compiles", abi.compile() === 0 && abi.pageCount(
 abi.setFile("/main.typ", "#let broken = ");
 abi.setMain("/main.typ");
 abi.compile();
+const pixelPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+check("remote file registration accepted", abi.setRemoteFile("https://bucket.example.com/pixel.png", pixelPng) === 0);
+abi.setFile("/main.typ", '#image("https://bucket.example.com/pixel.png", width: 1cm)');
+abi.setMain("/main.typ");
+check("remote url image compiles from registered bytes", abi.compile() === 0 && abi.pageCount() === 1, `status=${abi.compile()}`);
+check("remote file removal accepted", abi.removeRemoteFile("https://bucket.example.com/pixel.png") === 0);
+
+abi.setFile("/main.typ", "#let broken = ");
+abi.setMain("/main.typ");
+abi.compile();
 const diagnostics = abi.diagnostics();
 check("diagnostics surface errors", diagnostics.some(item => item.severity === "error"), `${diagnostics.length} item(s)`);
 

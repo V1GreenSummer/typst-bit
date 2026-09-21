@@ -268,6 +268,29 @@ export async function uploadToAliyunOss(
 }
 
 /**
+ * Turns a thrown upload error into an actionable message. Browser fetch only
+ * reports a bare TypeError when CORS blocks the request (or the network is
+ * unreachable), and AbortError when the timeout fires.
+ */
+export function describeUploadFailure(
+  error,
+  { method = "PUT", url = "", timeoutMs = 30000 } = {},
+) {
+  const target = url ? ` ${method} ${url}` : "";
+  if (error?.name === "AbortError") {
+    return `上传超时（${timeoutMs}ms）：${method}${target} 无响应，检查网络与 Endpoint 区域`;
+  }
+  if (error instanceof TypeError || error?.name === "TypeError") {
+    return `无法访问${target}（浏览器仅报 TypeError: ${error.message}）。` +
+      `通常是没有匹配的跨域规则：请在 OSS 控制台 → Bucket → 权限管理 → 跨域设置添加规则，` +
+      `来源填本站或 *，允许 Methods 勾选 PUT/POST/GET/HEAD，` +
+      `允许 Headers 填 authorization,content-type,date（或 *），` +
+      `暴露 Headers 填 ETag,x-oss-request-id；也可改用表单直传（POST）后重试`;
+  }
+  return error?.message ?? String(error);
+}
+
+/**
  * Aliyun OSS form upload (PostObject). Works when PUT is blocked (CDN in
  * front, restrictive CORS) because the form is a simple request signed by a
  * policy instead of the Authorization header.
@@ -310,7 +333,7 @@ export async function uploadToAliyunOssPost(
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new Error(await describeOssError(response, { method: "PUT", url }));
+      throw new Error(await describeOssError(response, { method: "POST", url: base }));
     }
     return buildPublicUrl({ ...settings, endpoint: base }, key);
   } finally {

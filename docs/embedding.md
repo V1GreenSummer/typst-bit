@@ -8,7 +8,7 @@ Typst.bit 按“编译器 → 核心模块 → 工作台 → 插件”分层，�
 |---|---|---|
 | 编译器 ABI | `rust/typst-abi` → `typst_abi.opt.wasm` | 纯 wasm32 无导入模块：编译、诊断 JSON、分页 PNG、PDF、SVG、包文件注册；Node 与浏览器均可实例化 |
 | 核心模块 | `app/typstbit/web_wasm/{session,commands,outline,packages,plugins}.js` | 无 DOM 依赖（plugins 仅在无 localStorage 时退回内存）；ES module 直接 import |
-| 编辑器 facade | `editor-adapter-cmb.js` | CodeMoonBit（wasm-gc）封装：选区变换、诊断、搜索、自动闭合、主题、撤销重做 |
+| 远程资源 | `typst_abi_set_remote_file(url, bytes)`：把 `https://…` 图片/资源字节注册进 VFS，源码保留 URL、编译离线可解析 | `editor-adapter-cmb.js` | CodeMoonBit（wasm-gc）封装：选区变换、诊断、搜索、自动闭合、主题、撤销重做 |
 | 工作台 UI | `workbench.js` + `workbench.css` | 菜单/工具栏/命令面板/大纲/设置等完整参考实现 |
 | 插件系统 | `plugins.js` + `docs/plugins.md` | 命令、菜单、导出格式、设置表单的宿主 API |
 

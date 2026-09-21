@@ -40,6 +40,17 @@ class TypstAbi {
     return this.ex.typst_abi_set_package_file(specPtr, specLen, filePtr, fileLen, dataPtr, dataLen);
   }
 
+  setRemoteFile(url, data) {
+    const [urlPtr, urlLen] = this.put(url);
+    const [dataPtr, dataLen] = this.put(data);
+    return this.ex.typst_abi_set_remote_file(urlPtr, urlLen, dataPtr, dataLen);
+  }
+
+  removeRemoteFile(url) {
+    const [urlPtr, urlLen] = this.put(url);
+    return this.ex.typst_abi_remove_remote_file(urlPtr, urlLen);
+  }
+
   setMain(path) {
     const [pathPtr, pathLen] = this.put(path);
     return this.ex.typst_abi_set_main(pathPtr, pathLen);

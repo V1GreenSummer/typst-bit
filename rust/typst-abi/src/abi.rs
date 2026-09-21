@@ -324,6 +324,47 @@ pub unsafe extern "C" fn typst_abi_remove_file(
     }
 }
 
+/// Register bytes for an `http(s)://` URL used by `#image`/`#read`. The
+/// source keeps the URL; the VFS resolves it from these bytes offline.
+#[no_mangle]
+pub unsafe extern "C" fn typst_abi_set_remote_file(
+    url_ptr: usize,
+    url_len: usize,
+    data_ptr: usize,
+    data_len: usize,
+) -> u32 {
+    unsafe {
+        let url = match read_path(url_ptr, url_len) {
+            Ok(url) => url,
+            Err(status) => return status,
+        };
+        let data = match read_bytes(data_ptr, data_len) {
+            Ok(data) => data,
+            Err(status) => return status,
+        };
+        match state().world.set_remote_file(url, data) {
+            Ok(()) => OK,
+            Err(_) => E_INVALID_ARG,
+        }
+    }
+}
+
+/// Drop a remote URL registered with [`typst_abi_set_remote_file`].
+#[no_mangle]
+pub unsafe extern "C" fn typst_abi_remove_remote_file(
+    url_ptr: usize,
+    url_len: usize,
+) -> u32 {
+    unsafe {
+        let url = match read_path(url_ptr, url_len) {
+            Ok(url) => url,
+            Err(status) => return status,
+        };
+        state().world.remove_remote_file(url);
+        OK
+    }
+}
+
 /// Record the main file path (must be set before `compile`).
 #[no_mangle]
 pub unsafe extern "C" fn typst_abi_set_main(

@@ -1,7 +1,7 @@
 import { createSession, STATUS } from "./session.js";
 import { loadCore } from "./core-adapter.js";
 import { loadPackageManifest, registerPackage } from "./packages.js";
-import { cloudUploadReady, pasteTargetOf, uploadImage } from "./image-host.js";
+import { cloudUploadReady, describeUploadFailure, pasteTargetOf, uploadImage } from "./image-host.js";
 import {
   definePlugin,
   getPlugins,
@@ -116,6 +116,15 @@ class Abi {
   }
   setMain(path) { const [pp, plen] = this.putStr(path); return this.ex.typst_abi_set_main(pp, plen); }
   removeFile(path) { const [pp, plen] = this.putStr(path); return this.ex.typst_abi_remove_file(pp, plen); }
+  setRemoteFile(url, bytes) {
+    const [up, ulen] = this.putStr(url);
+    const [dp, dlen] = this.put(bytes);
+    return this.ex.typst_abi_set_remote_file(up, ulen, dp, dlen);
+  }
+  removeRemoteFile(url) {
+    const [up, ulen] = this.putStr(url);
+    return this.ex.typst_abi_remove_remote_file(up, ulen);
+  }
   compile() { return this.ex.typst_abi_compile(); }
   pageCount() { return this.ex.typst_abi_page_count(); }
   renderPagePng(page, scaleMilli) {
@@ -440,6 +449,33 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return bytes;
   }
+
+  const remoteAssets = new Map();
+
+  function loadRemoteAssets() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("typstbit.remote-assets") ?? "[]");
+      for (const entry of raw) {
+        if (entry?.url && typeof entry.data === "string") {
+          remoteAssets.set(entry.url, { bytes: base64ToBytes(entry.data), name: entry.name ?? "" });
+        }
+      }
+    } catch {}
+  }
+
+  function saveRemoteAssets() {
+    try {
+      localStorage.setItem("typstbit.remote-assets", JSON.stringify(
+        [...remoteAssets.entries()].map(([url, asset]) => ({
+          url,
+          name: asset.name ?? "",
+          data: bytesToBase64(asset.bytes),
+        })),
+      ));
+    } catch {}
+  }
+
+  loadRemoteAssets();
 
   function loadProject() {
     try {
@@ -1265,12 +1301,17 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
     for (const file of files) {
       if (preferCloud) {
         try {
+          const bytes = new Uint8Array(await file.arrayBuffer());
           const url = await uploadImage(host, file);
+          remoteAssets.set(url, { bytes, name: file.name ?? "" });
+          saveRemoteAssets();
+          bridge.setRemoteFile(url, bytes);
+          syncedRemote.add(url);
           editor.insertBlock(`#image("${url}")`);
           uploaded += 1;
           continue;
         } catch (error) {
-          toast(`图床上传失败，改用本地图片：${error.message}`);
+          toast(`图床上传失败，改用本地图片：${describeUploadFailure(error, { method: (host.uploadMethod ?? "put") === "post" ? "POST" : "PUT" })}`);
         }
       }
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -1296,8 +1337,24 @@ export async function bootWorkbench({ abiWasmUrl, host }) {
   }
 
   const syncedFiles = new Set();
+  const syncedRemote = new Set();
+
+  function syncRemoteToVfs() {
+    for (const url of [...syncedRemote]) {
+      if (!remoteAssets.has(url)) {
+        bridge.removeRemoteFile(url);
+        syncedRemote.delete(url);
+      }
+    }
+    for (const [url, asset] of remoteAssets) {
+      const status = bridge.setRemoteFile(url, asset.bytes);
+      if (status !== 0) throw new Error(`set_remote_file ${url} status ${status}`);
+      syncedRemote.add(url);
+    }
+  }
 
   function syncProjectToVfs() {
+    syncRemoteToVfs();
     for (const path of [...syncedFiles]) {
       if (!project.has(path)) {
         bridge.removeFile(path);

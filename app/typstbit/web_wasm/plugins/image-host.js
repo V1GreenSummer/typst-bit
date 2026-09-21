@@ -1,5 +1,5 @@
 import { definePlugin } from "../plugins.js";
-import { cloudUploadReady, uploadImage } from "../image-host.js";
+import { cloudUploadReady, describeUploadFailure, uploadImage } from "../image-host.js";
 
 const TEST_PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
@@ -67,7 +67,13 @@ export default definePlugin({
         label: "测试图床上传",
         category: "插件",
         run: () => {
-          testUpload(api).catch(error => api.ui.toast(`图床上传失败：${error.message}`));
+          testUpload(api).catch(error => {
+            const values = api.settings.all();
+            const method = (values.provider ?? "aliyun-oss") === "aliyun-oss"
+              ? ((values.uploadMethod ?? "put") === "post" ? "POST" : "PUT")
+              : "POST";
+            api.ui.toast(`图床上传失败：${describeUploadFailure(error, { method })}`);
+          });
         },
       },
       {

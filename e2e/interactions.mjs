@@ -648,6 +648,24 @@ await page.evaluate(() => {
     return original(input, init);
   };
 });
+const remoteKeys = await page.evaluate(() => JSON.parse(localStorage.getItem("typstbit.remote-assets") ?? "[]").map(entry => entry.url));
+check("uploaded bytes are persisted for offline preview", remoteKeys.some(url => url.startsWith("https://cdn.example.com/typstbit/")), JSON.stringify(remoteKeys));
+
+const ossUrl = (uploaded.doc.match(/#image\("(https:\/\/cdn\.example\.com\/[^"]+)"\)/) ?? [])[1];
+await page.evaluate(url => {
+  globalThis.__typstbit.editor.setDoc(`= 云端图片\n\n#image("${url}", width: 2cm)\n`);
+}, ossUrl);
+await waitFor(() => globalThis.__typstbit.app.exports.e2e_status() === 2, "oss-only doc compile");
+check("oss-only document compiles offline", (await exports(() => globalThis.__typstbit.app.exports.e2e_error_count())) === 0);
+
+await page.reload();
+await waitFor(() => globalThis.__typstbit?.ready && globalThis.__typstbit.app.exports.e2e_status() === 2, "reload with remote asset");
+check(
+  "oss link still compiles after reload",
+  (await doc()).includes(ossUrl) && (await exports(() => globalThis.__typstbit.app.exports.e2e_error_count())) === 0,
+  (await doc()).slice(0, 40),
+);
+
 const localTarget = await pasteAndWait("local-target.png");
 check(
   "paste target local skips the upload",

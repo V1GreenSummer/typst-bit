@@ -9,6 +9,7 @@ import {
   buildObjectKey,
   cloudUploadReady,
   pasteTargetOf,
+  describeUploadFailure,
   uploadToAliyunOssPost,
   describeOssError,
   resolveOssBase,
@@ -229,6 +230,22 @@ check(
   "non-OSS proxies are called out in error messages",
   proxyError.includes("nginx") && proxyError.includes("CDN/Nginx/反代"),
   proxyError,
+);
+
+check(
+  "cors failures get an actionable message",
+  describeUploadFailure(new TypeError("Failed to fetch"), { method: "PUT", url: "https://b.oss-cn-beijing.aliyuncs.com" })
+    .includes("跨域设置") &&
+    describeUploadFailure(new TypeError("Failed to fetch"), { method: "PUT", url: "x" }).includes("PUT"),
+  describeUploadFailure(new TypeError("Failed to fetch"), { method: "PUT", url: "https://b/x" }),
+);
+check(
+  "timeouts get an actionable message",
+  describeUploadFailure(Object.assign(new Error("aborted"), { name: "AbortError" }), { timeoutMs: 1500 }).includes("1500ms"),
+);
+check(
+  "other upload errors pass through",
+  describeUploadFailure(new Error("OSS HTTP 403 AccessDenied"), {}).includes("AccessDenied"),
 );
 
 check(

@@ -114,6 +114,11 @@ pub struct VfsWorld {
     main: Option<FileId>,
     sources: HashMap<FileId, Source>,
     blobs: HashMap<FileId, Bytes>,
+    /// Bytes for `http(s)://` URLs registered by the host, keyed by the
+    /// normalized URL. Typst resolves `#image("https://…")` to a virtual
+    /// path; [`VfsWorld::file`] falls back to this map so remote links keep
+    /// working offline once their bytes are registered.
+    remote: HashMap<String, Bytes>,
     versions: HashMap<FileId, u64>,
     today_override: Option<Datetime>,
 }
@@ -132,6 +137,7 @@ impl VfsWorld {
             main: None,
             sources: HashMap::new(),
             blobs: HashMap::new(),
+            remote: HashMap::new(),
             versions: HashMap::new(),
             today_override: None,
         }
@@ -201,6 +207,23 @@ impl VfsWorld {
         existed
     }
 
+    /// Register bytes for an `http(s)://` URL. The key is normalized the
+    /// same way Typst normalizes virtual paths, so resolution matches no
+    /// matter which directory the referencing file lives in.
+    pub fn set_remote_file(&mut self, url: &str, data: &[u8]) -> Result<(), PathReject> {
+        let key = remote_key(url).ok_or(PathReject::Invalid)?;
+        self.remote.insert(key, Bytes::new(data.to_vec()));
+        Ok(())
+    }
+
+    /// Drop a previously registered remote URL. Returns whether it existed.
+    pub fn remove_remote_file(&mut self, url: &str) -> bool {
+        match remote_key(url) {
+            Some(key) => self.remote.remove(&key).is_some(),
+            None => false,
+        }
+    }
+
     /// Record the main file path. The file does not need to exist yet;
     /// [`VfsWorld::compile`] reports `E_MAIN_NOT_SET` semantics via
     /// [`VfsWorld::main_is_available`].
@@ -243,6 +266,47 @@ fn path_is_typst_source(display_path: &str) -> bool {
     display_path.ends_with(".typ")
 }
 
+/// Normalize an `http(s)://` URL into the lookup key shared by registration
+/// and resolution: lowercase scheme, Typst-style path folding for the rest.
+pub fn remote_key(url: &str) -> Option<String> {
+    let (scheme, rest) = url.split_once("://")?;
+    let scheme = scheme.to_ascii_lowercase();
+    if scheme != "http" && scheme != "https" {
+        return None;
+    }
+    if rest.is_empty() {
+        return None;
+    }
+    let vpath = VirtualPath::new(format!("/{rest}")).ok()?;
+    Some(format!("{scheme}://{}", vpath.get_without_slash()))
+}
+
+/// Recover the URL key from a resolved virtual path. Typst resolves
+/// `https://…` relative to the referencing file's directory, so the scheme
+/// segment can appear after any number of directory segments; everything
+/// before `http:`/`https:` is ignored.
+fn remote_key_of(id: FileId) -> Option<String> {
+    let path = id.vpath().get_without_slash();
+    let mut scheme: Option<String> = None;
+    let mut rest: Vec<&str> = Vec::new();
+    for segment in path.split('/') {
+        let lower = segment.to_ascii_lowercase();
+        if lower == "http:" || lower == "https:" {
+            scheme = Some(lower);
+            rest.clear();
+            continue;
+        }
+        if scheme.is_some() {
+            rest.push(segment);
+        }
+    }
+    let scheme = scheme?;
+    if rest.is_empty() {
+        return None;
+    }
+    Some(format!("{scheme}//{}", rest.join("/")))
+}
+
 impl World for VfsWorld {
     fn library(&self) -> &LazyHash<Library> {
         &self.library
@@ -273,10 +337,15 @@ impl World for VfsWorld {
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        self.blobs
-            .get(&id)
-            .cloned()
-            .ok_or_else(|| FileError::NotFound(self.display_path_of(id).into()))
+        if let Some(bytes) = self.blobs.get(&id) {
+            return Ok(bytes.clone());
+        }
+        if let Some(key) = remote_key_of(id) {
+            if let Some(bytes) = self.remote.get(&key) {
+                return Ok(bytes.clone());
+            }
+        }
+        Err(FileError::NotFound(self.display_path_of(id).into()))
     }
 
     fn font(&self, index: usize) -> Option<Font> {

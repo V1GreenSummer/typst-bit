@@ -23,6 +23,8 @@ node native-cli.test.mjs  # 原生 CLI（MoonBit native + Rust staticlib；未�
 
 体验修订（2026-09-21）：修复连续中文 IME 提交覆盖上一个字（合成提交的光标映射）；删除字符时因编译后诊断同步重复整稿渲染导致的光标闪烁（诊断列表未变化时跳过重渲染）；图床默认支持阿里云 OSS（PUT + V1 签名 + 自定义域名），新增“粘贴图片默认保存位置”设置（默认云端，文档插入 OSS 链接；失败回退本地并提示）；OSS 支持 PUT 与表单直传（POST）两种方式，Endpoint 兼容 `oss-cn-beijing` 等简写（自动补 `.aliyuncs.com` 与 Bucket 子域），405 等错误附带请求 URL/是否 OSS 响应的定位信息，并提供“测试图床上传”命令；插件设置面板改为“一插件一卡片”，插件菜单按插件分组加分隔。
 
+云端链接修订（2026-09-21）：ABI 新增 `typst_abi_set_remote_file`/`typst_abi_remove_remote_file`，World 在本地 VFS 未命中时按规范化 URL 回退查找已注册字节；工作台上传成功后注册字节并持久化（离线/刷新后预览仍可编译），图床错误补充 CORS/超时可操作提示并修复 POST 失败分支引用错误。
+
 原生修订（2026-09-21，P4）：`rust/typst-abi` 增加 staticlib，MoonBit native CLI/MCP 直接链接（`tools/build-native-cli.sh`，`tools/typstbit-cli` 薄包装，`tools/typstbit-mcp.mjs` 优先原生并回退 Node）；`native-cli.test.mjs` 覆盖 compile/outline/pdf/svg/png 与错误路径。
 
 核心修订（2026-09-21，P1–P3）：应用核心（`app/typstbit/core` → `core.wasm`）默认驱动菜单/工具栏/顶栏结构、命令面板筛选与按钮状态、大纲、包检测与诊断映射；JS 删除 `outline.js` 与包扫描、目录元数据（仅保留执行映射），Node/浏览器共用 `core-adapter.js`，`core.test.mjs` 以冻结黄金样例对拍。

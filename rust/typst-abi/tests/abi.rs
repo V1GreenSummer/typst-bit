@@ -328,3 +328,125 @@ fn export_svg_round_trip() {
 
     assert_eq!(unsafe { typst_abi_export_svg(2) }, 0, "out of range page");
 }
+
+/// Register remote bytes via the arena round-trip.
+fn set_remote_file(url: &str, data: &[u8]) -> u32 {
+    let (u, ulen) = put(url.as_bytes());
+    let (d, dlen) = put(data);
+    unsafe { typst_abi_set_remote_file(u, ulen, d, dlen) }
+}
+
+fn remove_remote_file(url: &str) -> u32 {
+    let (u, ulen) = put(url.as_bytes());
+    unsafe { typst_abi_remove_remote_file(u, ulen) }
+}
+
+/// A tiny valid PNG (1x1, transparent) used as remote image bytes.
+const PIXEL_PNG: &[u8] = &[
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+    0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0xDA, 0x63, 0xFC, 0xCF, 0xC0, 0x50,
+    0x0F, 0x00, 0x04, 0x85, 0x01, 0x80, 0x84, 0xA9, 0x8C, 0x21, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+    0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+];
+
+#[test]
+fn remote_url_bytes_resolve_from_any_directory() {
+    let _guard = lock();
+    assert_eq!(typst_abi_reset(), OK);
+    assert_eq!(
+        set_remote_file("https://bucket.oss-cn-beijing.aliyuncs.com/a/pixel.png", PIXEL_PNG),
+        OK
+    );
+    // Root file: the URL resolves relative to `/`.
+    assert_eq!(
+        set_file(
+            "/main.typ",
+            b"#image(\"https://bucket.oss-cn-beijing.aliyuncs.com/a/pixel.png\")",
+        ),
+        OK
+    );
+    assert_eq!(set_main("/main.typ"), OK);
+    assert_eq!(compile(), OK, "root reference should resolve: {:?}", error_json());
+    assert_eq!(unsafe { typst_abi_page_count() }, 1);
+}
+
+#[test]
+fn remote_url_resolves_relative_to_nested_files() {
+    let _guard = lock();
+    assert_eq!(typst_abi_reset(), OK);
+    assert_eq!(
+        set_remote_file("https://bucket.example.com/x.png", PIXEL_PNG),
+        OK
+    );
+    // Nested file: Typst looks the URL up under `/chapters/https:/…`.
+    assert_eq!(
+        set_file("/chapters/part.typ", b"#image(\"https://bucket.example.com/x.png\")"),
+        OK
+    );
+    assert_eq!(set_file("/main.typ", b"#include \"chapters/part.typ\""), OK);
+    assert_eq!(set_main("/main.typ"), OK);
+    assert_eq!(compile(), OK, "nested reference should resolve: {:?}", error_json());
+}
+
+#[test]
+fn remote_url_keys_fold_and_lowercase_like_typst() {
+    let _guard = lock();
+    assert_eq!(typst_abi_reset(), OK);
+    // Register with an uppercase scheme and redundant separators; resolve with
+    // the canonical spelling.
+    assert_eq!(
+        set_remote_file("HTTPS://bucket.example.com//a/./pixel.png", PIXEL_PNG),
+        OK
+    );
+    assert_eq!(
+        set_file("/main.typ", b"#image(\"https://bucket.example.com/a/pixel.png\")"),
+        OK
+    );
+    assert_eq!(set_main("/main.typ"), OK);
+    assert_eq!(compile(), OK, "{:?}", error_json());
+}
+
+#[test]
+fn remote_file_can_be_read_and_removed() {
+    let _guard = lock();
+    assert_eq!(typst_abi_reset(), OK);
+    assert_eq!(
+        set_remote_file("https://bucket.example.com/data.txt", b"remote text"),
+        OK
+    );
+    assert_eq!(
+        set_file(
+            "/main.typ",
+            b"#image(\"https://bucket.example.com/data.txt\", format: \"png\")",
+        ),
+        OK
+    );
+    assert_eq!(set_main("/main.typ"), OK);
+    // Not a real PNG, but the point is that the bytes were found; image
+    // decoding fails with a diagnosable status rather than "file not found".
+    let _ = compile();
+    let json = error_json().unwrap_or_default();
+    assert!(
+        !json.contains("file not found"),
+        "bytes should resolve before decoding: {json}"
+    );
+    // `#read` resolves through the same fallback.
+    assert_eq!(
+        set_file("/main.typ", b"#read(\"https://bucket.example.com/data.txt\")"),
+        OK
+    );
+    assert_eq!(compile(), OK, "{:?}", error_json());
+    assert_eq!(remove_remote_file("https://bucket.example.com/data.txt"), OK);
+    assert_eq!(compile(), E_COMPILE_ERRORS, "removed URL must not resolve anymore");
+    let json = error_json().unwrap_or_default();
+    assert!(json.contains("network access is not supported") || json.contains("file not found"), "{json}");
+}
+
+#[test]
+fn remote_file_rejects_non_http_urls() {
+    let _guard = lock();
+    assert_eq!(typst_abi_reset(), OK);
+    assert_eq!(set_remote_file("ftp://bucket.example.com/x.png", PIXEL_PNG), E_INVALID_ARG);
+    assert_eq!(set_remote_file("not a url", PIXEL_PNG), E_INVALID_ARG);
+}
