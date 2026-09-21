@@ -39,6 +39,9 @@ pub struct EditorView {
   priv mut line_html_cache : Array[(String, @ffi.JsAny)?]
   priv mut gutter_html_cache : Array[(String, @ffi.JsAny)?]
   priv mut cache_gen : Int
+  /// Allows host-initiated document replacement (`set_doc`) in read-only
+  /// mode: read-only blocks user input, not programmatic value setting.
+  priv mut host_edit : Bool
 }
 
 ///|
@@ -87,6 +90,7 @@ pub fn EditorView::new(
     line_html_cache: [],
     gutter_html_cache: [],
     cache_gen: 0,
+    host_edit: false,
   }
   view.client_width = @ffi.client_width(scroller)
   view.client_height = @ffi.client_height(scroller)
@@ -987,7 +991,7 @@ pub fn EditorView::apply_spec(
   self : EditorView,
   spec : @state.TransactionSpec,
 ) -> Bool {
-  if self.options.read_only {
+  if self.options.read_only && !self.host_edit {
     match spec.changes {
       Some(cs) => if !cs.is_empty() { return false }
       None => ()
@@ -1016,6 +1020,7 @@ pub fn EditorView::apply_spec(
 ///|
 pub fn EditorView::set_doc(self : EditorView, text : String) -> Unit {
   self.invalidate_render_cache()
+  self.host_edit = true
   let changes = @core.ChangeSet::of(
     [@core.Change::new(0, self.state.length(), text)],
   )
@@ -1026,6 +1031,7 @@ pub fn EditorView::set_doc(self : EditorView, text : String) -> Unit {
     scroll_into_view=true,
   )
   let _ = self.apply_spec(spec)
+  self.host_edit = false
 }
 
 ///|
