@@ -1,6 +1,6 @@
 ///|
 test "project: add, edit, remove and active fallback" {
-  let project = Project::new("= A")
+  let project = @app.Project::new("= A")
   assert_eq(project.active, "/main.typ")
   assert_eq(project.active_text(), "= A")
   assert_eq(project.add_file("/lib.typ", "#let x = 1"), Ok(()))
@@ -28,25 +28,25 @@ test "project: add, edit, remove and active fallback" {
 
 ///|
 test "project: image path detection" {
-  assert_true(is_image_path("/images/a.PNG"))
-  assert_true(is_image_path("/x/y.jpeg"))
-  assert_true(is_image_path("/a.webp"))
-  assert_false(is_image_path("/a.typ"))
-  assert_false(is_image_path("/png"))
+  assert_true(@app.is_image_path("/images/a.PNG"))
+  assert_true(@app.is_image_path("/x/y.jpeg"))
+  assert_true(@app.is_image_path("/a.webp"))
+  assert_false(@app.is_image_path("/a.typ"))
+  assert_false(@app.is_image_path("/png"))
 }
 
 ///|
 test "project: json round trip" {
-  let project = Project::new("= A")
+  let project = @app.Project::new("= A")
   project.add_file("/lib.typ", "#let x = 1") |> ignore
   project.add_folder("/images") |> ignore
   project.active = "/lib.typ"
-  let restored = Project::from_json_string(project.to_json_string(), "fallback")
+  let restored = @app.Project::from_json_string(project.to_json_string(), "fallback")
   assert_eq(restored, project)
-  let broken = Project::from_json_string("{not json", "fallback")
+  let broken = @app.Project::from_json_string("{not json", "fallback")
   assert_eq(broken.active, "/main.typ")
   assert_eq(broken.active_text(), "fallback")
-  let partial = Project::from_json_string(
+  let partial = @app.Project::from_json_string(
     "{\"files\":[{\"path\":\"/lib.typ\",\"kind\":\"text\",\"text\":\"#let z = 2\"}],\"active\":\"/lib.typ\"}",
     "fallback",
   )

@@ -35,6 +35,12 @@ pub(all) enum CompileStatus {
 } derive(Debug, Eq)
 
 ///|
+pub extend CompileStatus with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend CompileStatus with Eq::{not_equal, equal}
+
+///|
 /// Side effects the shell must perform after `update`.
 pub(all) enum Action {
   /// Enter the D4 paint schedule: render the Compiling state, wait two
@@ -46,6 +52,12 @@ pub(all) enum Action {
   /// `PreviewSource`.
   RequestPageImage(revision~ : Int, page~ : Int)
 } derive(Debug, Eq)
+
+///|
+pub extend Action with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Action with Eq::{not_equal, equal}
 
 ///|
 pub(all) struct Model {
@@ -78,6 +90,12 @@ pub(all) struct Model {
 } derive(Debug, Eq)
 
 ///|
+pub extend Model with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Model with Eq::{not_equal, equal}
+
+///|
 /// Messages into the state machine.
 pub(all) enum Msg {
   /// The textbox content changed at time `now_ms`.
@@ -108,6 +126,12 @@ pub(all) enum Msg {
   NextPage
   GotoPage(page~ : Int)
 } derive(Debug, Eq)
+
+///|
+pub extend Msg with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Msg with Eq::{not_equal, equal}
 
 ///|
 pub fn Model::init(initial_source~ : String) -> Model {

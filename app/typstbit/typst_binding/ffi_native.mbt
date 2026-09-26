@@ -32,7 +32,7 @@ let native_read_pos : Array[Int] = []
 
 ///|
 fn native_utf8(text : String) -> Bytes {
-  @utf8.encode(text)
+  utf8_bytes(text)
 }
 
 ///|
@@ -69,7 +69,7 @@ fn typst_page_image(_page : Int, _scale_milli : Int, _revision : Int) -> Int {
 
 ///|
 fn typst_error_json() -> Int {
-  native_texts.push(@utf8.decode_lossy(typstbind_error_json()))
+  native_texts.push(utf8_text(typstbind_error_json()))
   native_read_pos.push(0)
   native_texts.length()
 }

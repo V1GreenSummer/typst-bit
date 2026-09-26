@@ -337,8 +337,8 @@ fn take_line(buffer : String) -> (String?, String) {
   if index < 0 {
     (None, buffer)
   } else {
-    let head = StringBuilder::new()
-    let tail = StringBuilder::new()
+    let head = StringBuilder()
+    let tail = StringBuilder()
     for i = 0; i < chars.length(); i = i + 1 {
       if i < index {
         head.write_char(chars[i])

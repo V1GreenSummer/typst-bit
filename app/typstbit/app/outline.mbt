@@ -13,6 +13,12 @@ pub(all) struct OutlineEntry {
 } derive(Debug, Eq)
 
 ///|
+pub extend OutlineEntry with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend OutlineEntry with Eq::{not_equal, equal}
+
+///|
 fn strip_trailing_label(title : String) -> String {
   let chars = title.trim().to_owned().to_array()
   let mut end = chars.length()
@@ -26,7 +32,7 @@ fn strip_trailing_label(title : String) -> String {
       }
     }
   }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i in 0..<end {
     buf.write_char(chars[i])
   }

@@ -26,8 +26,8 @@ test "parse single error with position" {
   debug_inspect(d.file, content="Some(\"/main.typ\")")
   debug_inspect(d.line, content="Some(3)")
   debug_inspect(d.column, content="Some(1)")
-  inspect(error_count(diags), content="1")
-  inspect(warning_count(diags), content="0")
+  inspect(@typst_binding.error_count(diags), content="1")
+  inspect(@typst_binding.warning_count(diags), content="0")
 }
 
 ///|
@@ -60,8 +60,8 @@ test "parse warning and counts" {
     #|}
   let diags = @typst_binding.parse_diagnostics(json)
   inspect(diags.length(), content="3")
-  inspect(error_count(diags), content="1")
-  inspect(warning_count(diags), content="2")
+  inspect(@typst_binding.error_count(diags), content="1")
+  inspect(@typst_binding.warning_count(diags), content="2")
   inspect(diags[0].severity is Warning, content="true")
   debug_inspect(diags[1].line, content="Some(4)")
   debug_inspect(diags[2].line, content="None")

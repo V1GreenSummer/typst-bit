@@ -22,6 +22,12 @@ pub(all) enum TypstError {
 } derive(Debug, Eq)
 
 ///|
+pub extend TypstError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend TypstError with Eq::{not_equal, equal}
+
+///|
 /// Push `text` to the host's persistent typst table; returns its text id.
 fn push_text(text : String) -> Result[Int, TypstError] {
   let handle = typst_begin_create_string()
@@ -47,7 +53,7 @@ fn pull_text(text_id : Int) -> Result[String?, TypstError] {
   if handle == 0 {
     return Err(Fatal("begin_read_string returned 0 for id \{text_id}"))
   }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   while true {
     let code = typst_string_read_char(handle)
     if code == -1 {

@@ -42,16 +42,16 @@ let diags_err2 : Array[@typst_binding.Diagnostic] = [
 ]
 
 ///|
-fn step(model : Model, msg : Msg) -> (Model, Array[Action]) {
-  update(model, msg)
+fn step(model : @app.Model, msg : @app.Msg) -> (@app.Model, Array[@app.Action]) {
+  @app.update(model, msg)
 }
 
 ///|
-fn step_many(model : Model, msgs : Array[Msg]) -> (Model, Array[Action]) {
+fn step_many(model : @app.Model, msgs : Array[@app.Msg]) -> (@app.Model, Array[@app.Action]) {
   let mut m = model
-  let actions : Array[Action] = []
+  let actions : Array[@app.Action] = []
   for msg in msgs {
-    let (next, acts) = update(m, msg)
+    let (next, acts) = @app.update(m, msg)
     m = next
     for a in acts {
       actions.push(a)
@@ -62,7 +62,7 @@ fn step_many(model : Model, msgs : Array[Msg]) -> (Model, Array[Action]) {
 
 ///|
 test "initial document compiles on the first tick" {
-  let m0 = Model::init(initial_source="boot doc")
+  let m0 = @app.Model::init(initial_source="boot doc")
   inspect(m0.pending, content="true")
   let (m1, a1) = step(m0, DebounceTick(now_ms=0))
   inspect(a1.length(), content="1")
@@ -74,7 +74,7 @@ test "initial document compiles on the first tick" {
 
 ///|
 test "debounce window: edit arms, early tick does nothing, expiry compiles" {
-  let m0 = Model::init(initial_source="= Title")
+  let m0 = @app.Model::init(initial_source="= Title")
   // Edit at t=100 arms the window (deadline 400).
   let (m1, a1) = step(m0, SourceEdited(source="= Title v2", now_ms=100))
   inspect(a1.length(), content="0")
@@ -96,7 +96,7 @@ test "debounce window: edit arms, early tick does nothing, expiry compiles" {
 
 ///|
 test "continuous input compiles once with the latest source" {
-  let m0 = Model::init(initial_source="")
+  let m0 = @app.Model::init(initial_source="")
   let (m1, _) = step(m0, SourceEdited(source="a", now_ms=0))
   let (m2, _) = step(m1, SourceEdited(source="ab", now_ms=100))
   let (m3, _) = step(m2, SourceEdited(source="abc", now_ms=200))
@@ -116,9 +116,9 @@ test "continuous input compiles once with the latest source" {
 
 ///|
 test "status transitions: compiling -> success with pages and warnings" {
-  let m0 = Model::init(initial_source="doc")
+  let m0 = @app.Model::init(initial_source="doc")
   let (m1, _) = step(m0, SourceEdited(source="doc", now_ms=0))
-  let (m2, _) = step(m1, DebounceTick(now_ms=DEBOUNCE_MS))
+  let (m2, _) = step(m1, DebounceTick(now_ms=@app.DEBOUNCE_MS))
   inspect(m2.status is Compiling, content="true")
   // Success with 3 pages and 1 warning requests the first page image.
   let (m3, a3) = step(
@@ -137,9 +137,9 @@ test "status transitions: compiling -> success with pages and warnings" {
 
 ///|
 test "status transitions: compiling -> failed keeps counts" {
-  let m0 = Model::init(initial_source="doc")
+  let m0 = @app.Model::init(initial_source="doc")
   let (m1, _) = step(m0, SourceEdited(source="bad", now_ms=0))
-  let (m2, _) = step(m1, DebounceTick(now_ms=DEBOUNCE_MS))
+  let (m2, _) = step(m1, DebounceTick(now_ms=@app.DEBOUNCE_MS))
   let (m3, a3) = step(m2, CompileFailed(revision=1, diagnostics=diags_err2))
   guard m3.status is Failed(errors=2, warnings=1) else {
     fail("expected Failed(2, 1)")
@@ -150,10 +150,10 @@ test "status transitions: compiling -> failed keeps counts" {
 
 ///|
 test "page navigation bounds" {
-  let m0 = Model::init(initial_source="doc")
+  let m0 = @app.Model::init(initial_source="doc")
   let (m1, _) = step_many(m0, [
     SourceEdited(source="doc", now_ms=0),
-    DebounceTick(now_ms=DEBOUNCE_MS),
+    DebounceTick(now_ms=@app.DEBOUNCE_MS),
     CompileSucceeded(revision=1, page_count=3, warnings=0),
     PreviewSource(revision=1, page=0, source="blob:p0"),
     ImageReady(revision=1),
@@ -186,7 +186,7 @@ test "page navigation bounds" {
   let (m9, _) = step(m8, GotoPage(page=1))
   inspect(m9.current_page, content="1")
   // Navigation without a document is a no-op.
-  let fresh = Model::init(initial_source="")
+  let fresh = @app.Model::init(initial_source="")
   let (mf, af) = step(fresh, NextPage)
   inspect(mf.current_page, content="0")
   inspect(af.length(), content="0")
@@ -194,10 +194,10 @@ test "page navigation bounds" {
 
 ///|
 test "last-good preview survives a failing compile" {
-  let m0 = Model::init(initial_source="good")
+  let m0 = @app.Model::init(initial_source="good")
   let (m1, _) = step_many(m0, [
     SourceEdited(source="good", now_ms=0),
-    DebounceTick(now_ms=DEBOUNCE_MS),
+    DebounceTick(now_ms=@app.DEBOUNCE_MS),
     CompileSucceeded(revision=1, page_count=2, warnings=0),
     PreviewSource(revision=1, page=0, source="blob:good"),
     ImageReady(revision=1),
@@ -222,10 +222,10 @@ test "last-good preview survives a failing compile" {
 
 ///|
 test "no preview at all before the first successful compile" {
-  let m0 = Model::init(initial_source="")
+  let m0 = @app.Model::init(initial_source="")
   let (m1, _) = step_many(m0, [
     SourceEdited(source="#let x = ", now_ms=0),
-    DebounceTick(now_ms=DEBOUNCE_MS),
+    DebounceTick(now_ms=@app.DEBOUNCE_MS),
     CompileFailed(revision=1, diagnostics=diags_err),
   ])
   debug_inspect(m1.preview_source, content="None")
@@ -236,10 +236,10 @@ test "no preview at all before the first successful compile" {
 
 ///|
 test "stale revisions are dropped (compiles, previews, image events)" {
-  let m0 = Model::init(initial_source="v1")
+  let m0 = @app.Model::init(initial_source="v1")
   let (m1, _) = step_many(m0, [
     SourceEdited(source="v1", now_ms=0),
-    DebounceTick(now_ms=DEBOUNCE_MS), // rev 1
+    DebounceTick(now_ms=@app.DEBOUNCE_MS), // rev 1
   ])
   // A second edit arrives while rev 1 compiles; rev 2 is issued.
   let (m2, _) = step(m1, SourceEdited(source="v2", now_ms=500))
@@ -282,10 +282,10 @@ test "stale revisions are dropped (compiles, previews, image events)" {
 
 ///|
 test "fix and recover: failure then success clears errors and refreshes preview" {
-  let m0 = Model::init(initial_source="#let x = ")
+  let m0 = @app.Model::init(initial_source="#let x = ")
   let (m1, _) = step_many(m0, [
     SourceEdited(source="#let x = ", now_ms=0),
-    DebounceTick(now_ms=DEBOUNCE_MS),
+    DebounceTick(now_ms=@app.DEBOUNCE_MS),
     CompileFailed(revision=1, diagnostics=diags_err),
   ])
   guard m1.status is Failed(errors=1, warnings=0) else {
@@ -315,10 +315,10 @@ test "fix and recover: failure then success clears errors and refreshes preview"
 
 ///|
 test "image failure paths" {
-  let m0 = Model::init(initial_source="d")
+  let m0 = @app.Model::init(initial_source="d")
   let (m1, _) = step_many(m0, [
     SourceEdited(source="d", now_ms=0),
-    DebounceTick(now_ms=DEBOUNCE_MS),
+    DebounceTick(now_ms=@app.DEBOUNCE_MS),
     CompileSucceeded(revision=1, page_count=2, warnings=0),
   ])
   debug_inspect(m1.pending_image_page, content="Some(0)")
@@ -349,10 +349,10 @@ test "image failure paths" {
 
 ///|
 test "edit during compiling re-arms the debounce" {
-  let m0 = Model::init(initial_source="a")
+  let m0 = @app.Model::init(initial_source="a")
   let (m1, _) = step_many(m0, [
     SourceEdited(source="a", now_ms=0),
-    DebounceTick(now_ms=DEBOUNCE_MS),
+    DebounceTick(now_ms=@app.DEBOUNCE_MS),
   ])
   inspect(m1.status is Compiling, content="true")
   // Edit while compiling: window re-arms; the in-flight compile result is

@@ -16,6 +16,12 @@ pub(all) struct ThemeSettings {
 } derive(Debug, Eq)
 
 ///|
+pub extend ThemeSettings with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ThemeSettings with Eq::{not_equal, equal}
+
+///|
 pub fn ThemeSettings::default() -> ThemeSettings {
   {
     theme: "default",
@@ -36,6 +42,12 @@ pub(all) struct ThemePlan {
   /// CSS variables to set.
   variables : Array[(String, String)]
 } derive(Debug, Eq)
+
+///|
+pub extend ThemePlan with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ThemePlan with Eq::{not_equal, equal}
 
 ///|
 pub fn theme_ids() -> Array[String] {

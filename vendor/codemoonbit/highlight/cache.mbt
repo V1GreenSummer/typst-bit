@@ -9,7 +9,7 @@ pub struct HighlightCache {
 
 ///|
 pub fn HighlightCache::new(language : Language) -> HighlightCache {
-  { language, states: [], lines: [] }
+  { language, states: [], lines: [], }
 }
 
 ///|
@@ -30,7 +30,7 @@ pub fn HighlightCache::tokens_for_line(
   doc : @core.Text,
   line : Int,
 ) -> Array[Token] {
-  (self.tokens_and_state_for_line(doc, line)).1
+  self.tokens_and_state_for_line(doc, line).1
 }
 
 ///|

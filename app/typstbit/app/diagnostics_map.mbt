@@ -20,6 +20,12 @@ pub(all) struct RawDiagnostic {
 } derive(Debug, Eq)
 
 ///|
+pub extend RawDiagnostic with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend RawDiagnostic with Eq::{not_equal, equal}
+
+///|
 pub(all) struct EditorDiagnostic {
   severity : String
   message : String
@@ -28,6 +34,12 @@ pub(all) struct EditorDiagnostic {
   end_line : Int
   end_column : Int
 } derive(Debug, Eq)
+
+///|
+pub extend EditorDiagnostic with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend EditorDiagnostic with Eq::{not_equal, equal}
 
 ///|
 /// Parses the ABI's `{"diagnostics":[...]}` JSON into raw diagnostics.

@@ -22,6 +22,12 @@ pub(all) enum Severity {
 } derive(Debug, Eq)
 
 ///|
+pub extend Severity with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Severity with Eq::{not_equal, equal}
+
+///|
 /// One diagnostic in the narrow presentation model.
 pub(all) struct Diagnostic {
   severity : Severity
@@ -32,6 +38,12 @@ pub(all) struct Diagnostic {
   column : Int?
   file : String?
 } derive(Debug, Eq)
+
+///|
+pub extend Diagnostic with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Diagnostic with Eq::{not_equal, equal}
 
 ///|
 /// Parse the ABI's wide diagnostics JSON (design D7) into the narrow

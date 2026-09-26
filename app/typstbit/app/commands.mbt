@@ -14,6 +14,12 @@ pub(all) struct EditorView {
 } derive(Debug, Eq)
 
 ///|
+pub extend EditorView with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend EditorView with Eq::{not_equal, equal}
+
+///|
 pub(all) enum ActiveRule {
   NoActive
   Wrap(before~ : String, after~ : String)
@@ -21,11 +27,23 @@ pub(all) enum ActiveRule {
 } derive(Debug, Eq)
 
 ///|
+pub extend ActiveRule with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ActiveRule with Eq::{not_equal, equal}
+
+///|
 pub(all) enum EnabledRule {
   AlwaysEnabled
   NeedSelection
   NeedSelectionOrLineMarker
 } derive(Debug, Eq)
+
+///|
+pub extend EnabledRule with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend EnabledRule with Eq::{not_equal, equal}
 
 ///|
 pub(all) struct CommandSpec {
@@ -38,10 +56,22 @@ pub(all) struct CommandSpec {
 } derive(Debug, Eq)
 
 ///|
+pub extend CommandSpec with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend CommandSpec with Eq::{not_equal, equal}
+
+///|
 pub(all) struct MenuItem {
   id : String
   label : String?
 } derive(Debug, Eq)
+
+///|
+pub extend MenuItem with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend MenuItem with Eq::{not_equal, equal}
 
 ///|
 pub(all) struct MenuSpec {
@@ -50,11 +80,23 @@ pub(all) struct MenuSpec {
 } derive(Debug, Eq)
 
 ///|
+pub extend MenuSpec with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend MenuSpec with Eq::{not_equal, equal}
+
+///|
 pub(all) struct ButtonSpec {
   id : String
   label : String
   variant : String?
 } derive(Debug, Eq)
+
+///|
+pub extend ButtonSpec with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ButtonSpec with Eq::{not_equal, equal}
 
 ///|
 fn line_start_of(doc : String, index : Int) -> Int {
@@ -74,7 +116,7 @@ fn line_start_of(doc : String, index : Int) -> Int {
 fn line_text(doc : String, index : Int) -> String {
   let chars = doc.to_array()
   let start = line_start_of(doc, index)
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let mut i = start
   while i < chars.length() && chars[i] != '\n' {
     buf.write_char(chars[i])
@@ -117,7 +159,7 @@ pub fn EditorView::slice(self : EditorView, from : Int, to : Int) -> String {
   let len = chars.length()
   let start = if from < 0 { 0 } else if from > len { len } else { from }
   let end = if to < start { start } else if to > len { len } else { to }
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   for i in start..<end {
     buf.write_char(chars[i])
   }

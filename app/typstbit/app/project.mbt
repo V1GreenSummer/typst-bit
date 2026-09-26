@@ -12,11 +12,23 @@ pub(all) enum FileKind {
 } derive(Debug, Eq)
 
 ///|
+pub extend FileKind with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend FileKind with Eq::{not_equal, equal}
+
+///|
 pub(all) struct ProjectFile {
   path : String
   kind : FileKind
   text : String
 } derive(Debug, Eq)
+
+///|
+pub extend ProjectFile with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ProjectFile with Eq::{not_equal, equal}
 
 ///|
 pub(all) enum ProjectError {
@@ -25,11 +37,23 @@ pub(all) enum ProjectError {
 } derive(Debug, Eq)
 
 ///|
+pub extend ProjectError with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend ProjectError with Eq::{not_equal, equal}
+
+///|
 pub(all) struct Project {
   mut files : Array[ProjectFile]
   mut folders : Array[String]
   mut active : String
 } derive(Debug, Eq)
+
+///|
+pub extend Project with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend Project with Eq::{not_equal, equal}
 
 ///|
 /// Whether a path looks like an image (used to create binary entries).

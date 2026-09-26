@@ -1,7 +1,12 @@
 import {
+  "moonbitlang/core/debug",
   "V1GreenSummer/typstbit/typst_binding",
   "moonbitlang/core/json",
   "moonbitlang/core/string",
 }
+
+import {
+  "V1GreenSummer/typstbit/app" @app,
+} for "test"
 
 supported_targets = "all-js"

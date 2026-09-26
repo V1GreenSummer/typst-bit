@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "local/typstbit/typst_binding"
+package "V1GreenSummer/typstbit/typst_binding"
 
 import {
   "moonbitlang/core/debug",
@@ -20,6 +20,10 @@ pub fn parse_diagnostics(String) -> Array[Diagnostic] raise
 
 pub fn pull_registered_text(Int) -> Result[String?, TypstError]
 
+pub fn utf8_bytes(String) -> Bytes
+
+pub fn utf8_text(Bytes) -> String
+
 pub fn warning_count(Array[Diagnostic]) -> Int
 
 // Errors
@@ -32,12 +36,18 @@ pub(all) struct Diagnostic {
   column : Int?
   file : String?
 } derive(Eq, @debug.Debug)
+pub fn Diagnostic::equal(Self, Self) -> Bool
 pub fn Diagnostic::is_error(Self) -> Bool
+pub fn Diagnostic::not_equal(Self, Self) -> Bool
+pub fn Diagnostic::to_repr(Self) -> @debug.Repr
 
 pub(all) enum Severity {
   Error
   Warning
 } derive(Eq, @debug.Debug)
+pub fn Severity::equal(Self, Self) -> Bool
+pub fn Severity::not_equal(Self, Self) -> Bool
+pub fn Severity::to_repr(Self) -> @debug.Repr
 
 pub(all) enum TypstError {
   MainNotSet
@@ -45,6 +55,9 @@ pub(all) enum TypstError {
   InvalidArgument
   Fatal(String)
 } derive(Eq, @debug.Debug)
+pub fn TypstError::equal(Self, Self) -> Bool
+pub fn TypstError::not_equal(Self, Self) -> Bool
+pub fn TypstError::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

@@ -14,6 +14,12 @@ pub(all) struct PackageSpec {
 } derive(Debug, Eq)
 
 ///|
+pub extend PackageSpec with @moonbitlang/core/debug.Debug::{to_repr}
+
+///|
+pub extend PackageSpec with Eq::{not_equal, equal}
+
+///|
 fn spec_char(c : Char) -> Bool {
   (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-'
 }
@@ -25,7 +31,7 @@ fn spec_digit(c : Char) -> Bool {
 
 ///|
 fn chars_string(chars : Array[Char], from : Int, to : Int) -> String {
-  let buf = StringBuilder::new()
+  let buf = StringBuilder()
   let end = if to > chars.length() { chars.length() } else { to }
   let mut i = from
   while i < end {

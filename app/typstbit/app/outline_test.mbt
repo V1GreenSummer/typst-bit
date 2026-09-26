@@ -3,7 +3,7 @@
 
 ///|
 test "outline strips labels and tracks levels and lines" {
-  let entries = parse_outline(
+  let entries = @app.parse_outline(
     "= A <one>\n\n== B\n\n```\n= NotHeading\n```\n\n=== C",
   )
   assert_eq(entries.length(), 3)
@@ -20,12 +20,12 @@ test "outline strips labels and tracks levels and lines" {
 
 ///|
 test "outline ignores fenced code and plain text" {
-  let entries = parse_outline("just text\n\n```typ\n= hidden\n```")
+  let entries = @app.parse_outline("just text\n\n```typ\n= hidden\n```")
   assert_eq(entries.length(), 0)
 }
 
 ///|
 test "outline ignores levels beyond six and missing space" {
-  let entries = parse_outline("======= seven\n=NoSpace\n")
+  let entries = @app.parse_outline("======= seven\n=NoSpace\n")
   assert_eq(entries.length(), 0)
 }

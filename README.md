@@ -65,7 +65,7 @@ tools/typstbit-cli compile doc.typ
 
 ## 开发状态
 
-核心流程与四端复用已完成，测试共约 335 项（Rust 18、MoonBit 33、浏览器与集成断言 284），性能与体积预算纳入验收并达标（编译器 wasm 原始 38.40MiB、压缩 13.91MiB，首载 14.05MiB）。发布历史：MoonBit 模块 0.1.0。
+核心流程与四端复用已完成，测试共约 335 项（Rust 18、MoonBit 33、浏览器与集成断言 284），性能与体积预算纳入验收并达标（编译器 wasm 原始 38.40MiB、压缩 13.91MiB，首载 14.05MiB）。发布历史：MoonBit 模块已发布 V1GreenSummer/codemoonbit 0.1.2 与 V1GreenSummer/typstbit 0.1.1。
 
 ## 许可证与参考来源
 
