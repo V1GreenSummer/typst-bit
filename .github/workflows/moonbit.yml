@@ -1,0 +1,66 @@
+name: MoonBit CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  moonbit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The project requires moonc >= 0.10.14; the stable channel is older,
+      # so CI installs the development channel.
+      - name: Install MoonBit (dev channel)
+        run: |
+          export MOONBIT_INSTALL_DEV=1
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Verify toolchain version
+        run: |
+          moon version --all
+          version=$(moon version --all | sed -n 's/.*moonc v\([0-9][0-9.]*\).*/\1/p' | head -1)
+          echo "moonc=$version"
+          test -n "$version"
+          lowest=$(printf '%s\n0.10.14\n' "$version" | sort -V | head -1)
+          if [ "$lowest" != "0.10.14" ]; then
+            echo "moonc $version is older than the required 0.10.14"
+            exit 1
+          fi
+
+      # The development channel advances continuously and the formatter is
+      # version sensitive, so formatting drift is reported instead of failing.
+      - name: Format check (advisory)
+        run: moon fmt --check || echo "::warning title=MoonBit format drift::moon fmt differs with this toolchain version"
+
+      - name: Application core checks and tests
+        working-directory: app/typstbit
+        run: |
+          moon check
+          moon check --target native native_cli
+          moon test
+
+      - name: Vendored editor checks and tests
+        working-directory: vendor/codemoonbit
+        run: |
+          moon check
+          moon test --target wasm-gc
+          moon build --target wasm-gc
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Editor integration tests (Node DOM shim)
+        working-directory: vendor/codemoonbit
+        run: node js/e2e.mjs
+
+      - name: Core and host contract tests
+        working-directory: e2e
+        run: |
+          node core.test.mjs
+          node commands.test.mjs
+          node plugins.test.mjs
