@@ -33,7 +33,9 @@ jobs:
             exit 1
           fi
 
+      # The repository root is not a MoonBit module; app/typstbit is.
       - name: Format check
+        working-directory: app/typstbit
         run: moon fmt --check
 
       - name: Application core checks and tests
