@@ -6,10 +6,11 @@
 // absolute inside the virtual file system ("/main.typ", "/images/a.png").
 
 ///|
+#derive(Debug, Eq)
 pub(all) enum FileKind {
   TextFile
   BinaryFile
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend FileKind with @moonbitlang/core/debug.Debug::{to_repr}
@@ -18,11 +19,12 @@ pub extend FileKind with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend FileKind with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct ProjectFile {
   path : String
   kind : FileKind
   text : String
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend ProjectFile with @moonbitlang/core/debug.Debug::{to_repr}
@@ -31,10 +33,11 @@ pub extend ProjectFile with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend ProjectFile with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 pub(all) enum ProjectError {
   DuplicatePath(String)
   InvalidPath(String)
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend ProjectError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -43,11 +46,12 @@ pub extend ProjectError with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend ProjectError with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct Project {
   mut files : Array[ProjectFile]
   mut folders : Array[String]
   mut active : String
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend Project with @moonbitlang/core/debug.Debug::{to_repr}
@@ -92,7 +96,7 @@ pub fn is_valid_vfs_path(path : String) -> Bool {
 ///|
 pub fn Project::new(initial_text : String) -> Project {
   {
-    files: [{ path: "/main.typ", kind: TextFile, text: initial_text }],
+    files: [{ path: "/main.typ", kind: TextFile, text: initial_text, }],
     folders: [],
     active: "/main.typ",
   }
@@ -136,7 +140,7 @@ pub fn Project::add_file(
   self : Project,
   path : String,
   text : String,
-  kind? : FileKind = TextFile,
+  kind~ : FileKind = TextFile,
 ) -> Result[Unit, ProjectError] {
   if !is_valid_vfs_path(path) {
     return Err(InvalidPath(path))
@@ -144,7 +148,7 @@ pub fn Project::add_file(
   if self.has(path) {
     return Err(DuplicatePath(path))
   }
-  self.files.push({ path, kind, text })
+  self.files.push({ path, kind, text, })
   Ok(())
 }
 
@@ -155,7 +159,7 @@ pub fn Project::set_text(self : Project, path : String, text : String) -> Bool {
   for i = 0; i < self.files.length(); i = i + 1 {
     let file = self.files[i]
     if file.path == path && file.kind is TextFile {
-      self.files[i] = { path: file.path, kind: file.kind, text }
+      self.files[i] = { path: file.path, kind: file.kind, text, }
       return true
     }
   }
@@ -206,7 +210,7 @@ pub fn Project::remove(self : Project, path : String) -> ProjectFile? {
 ///|
 /// Lexicographic UTF-16 comparison (MoonBit's `String::compare` is shortlex,
 /// which would order paths by length first).
-fn compare_path(a : String, b : String) -> Int {
+fn compare_path(a : String, b : String) -> Int32 {
   let al = a.length()
   let bl = b.length()
   let n = if al < bl { al } else { bl }
@@ -285,7 +289,7 @@ pub fn Project::from_json_string(
   let parsed : Json? = Some(@json.parse(text)) catch { _ => None }
   match parsed {
     Some(Object(root)) => {
-      let project : Project = { files: [], folders: [], active: "/main.typ" }
+      let project : Project = { files: [], folders: [], active: "/main.typ", }
       match root.get("files") {
         Some(Array(items)) =>
           for item in items {

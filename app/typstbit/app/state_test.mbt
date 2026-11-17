@@ -47,7 +47,10 @@ fn step(model : @app.Model, msg : @app.Msg) -> (@app.Model, Array[@app.Action]) 
 }
 
 ///|
-fn step_many(model : @app.Model, msgs : Array[@app.Msg]) -> (@app.Model, Array[@app.Action]) {
+fn step_many(
+  model : @app.Model,
+  msgs : Array[@app.Msg],
+) -> (@app.Model, Array[@app.Action]) {
   let mut m = model
   let actions : Array[@app.Action] = []
   for msg in msgs {

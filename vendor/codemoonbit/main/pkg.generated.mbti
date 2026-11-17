@@ -6,69 +6,69 @@ import {
 }
 
 // Values
-pub fn cm_composition(Int, Int, @ffi.JsAny) -> Unit
+pub fn cm_composition(Int32, Int32, @ffi.JsAny) -> Unit
 
-pub fn cm_create(@ffi.JsAny, Int) -> Unit
+pub fn cm_create(@ffi.JsAny, Int32) -> Unit
 
-pub fn cm_destroy(Int) -> Unit
+pub fn cm_destroy(Int32) -> Unit
 
-pub fn cm_focus(Int) -> Unit
+pub fn cm_focus(Int32) -> Unit
 
-pub fn cm_focus_event(Int, Int) -> Unit
+pub fn cm_focus_event(Int32, Int32) -> Unit
 
-pub fn cm_fold_all(Int) -> Unit
+pub fn cm_fold_all(Int32) -> Unit
 
-pub fn cm_fold_click(Int, Int) -> Unit
+pub fn cm_fold_click(Int32, Int32) -> Unit
 
-pub fn cm_get_doc(Int) -> @ffi.JsAny
+pub fn cm_get_doc(Int32) -> @ffi.JsAny
 
-pub fn cm_get_html(Int) -> @ffi.JsAny
+pub fn cm_get_html(Int32) -> @ffi.JsAny
 
-pub fn cm_get_selection(Int) -> @ffi.JsAny
+pub fn cm_get_selection(Int32) -> @ffi.JsAny
 
-pub fn cm_get_state(Int) -> @ffi.JsAny
+pub fn cm_get_state(Int32) -> @ffi.JsAny
 
-pub fn cm_input(Int, @ffi.JsAny) -> Int
+pub fn cm_input(Int32, @ffi.JsAny) -> Int32
 
-pub fn cm_key(Int, @ffi.JsAny, @ffi.JsAny, Int) -> Int
+pub fn cm_key(Int32, @ffi.JsAny, @ffi.JsAny, Int32) -> Int32
 
-pub fn cm_mouse(Int, Int, Double, Double, Int, Int) -> Int
+pub fn cm_mouse(Int32, Int32, Double, Double, Int32, Int32) -> Int32
 
-pub fn cm_paste(Int, @ffi.JsAny) -> Unit
+pub fn cm_paste(Int32, @ffi.JsAny) -> Unit
 
-pub fn cm_redo(Int) -> Unit
+pub fn cm_redo(Int32) -> Unit
 
-pub fn cm_resize(Int, Double, Double) -> Unit
+pub fn cm_resize(Int32, Double, Double) -> Unit
 
-pub fn cm_scroll(Int, Double, Double) -> Unit
+pub fn cm_scroll(Int32, Double, Double) -> Unit
 
-pub fn cm_search_close(Int) -> Unit
+pub fn cm_search_close(Int32) -> Unit
 
-pub fn cm_search_next(Int) -> Unit
+pub fn cm_search_next(Int32) -> Unit
 
-pub fn cm_search_open(Int) -> Unit
+pub fn cm_search_open(Int32) -> Unit
 
-pub fn cm_search_prev(Int) -> Unit
+pub fn cm_search_prev(Int32) -> Unit
 
-pub fn cm_search_query(Int, @ffi.JsAny) -> Unit
+pub fn cm_search_query(Int32, @ffi.JsAny) -> Unit
 
-pub fn cm_search_replace(Int, @ffi.JsAny) -> Unit
+pub fn cm_search_replace(Int32, @ffi.JsAny) -> Unit
 
-pub fn cm_search_replace_all(Int, @ffi.JsAny) -> Unit
+pub fn cm_search_replace_all(Int32, @ffi.JsAny) -> Unit
 
-pub fn cm_selected_text(Int) -> @ffi.JsAny
+pub fn cm_selected_text(Int32) -> @ffi.JsAny
 
-pub fn cm_set_diagnostics(Int, @ffi.JsAny) -> Unit
+pub fn cm_set_diagnostics(Int32, @ffi.JsAny) -> Unit
 
-pub fn cm_set_doc(Int, @ffi.JsAny) -> Unit
+pub fn cm_set_doc(Int32, @ffi.JsAny) -> Unit
 
-pub fn cm_set_option(Int, @ffi.JsAny, @ffi.JsAny) -> Unit
+pub fn cm_set_option(Int32, @ffi.JsAny, @ffi.JsAny) -> Unit
 
-pub fn cm_set_selection(Int, Int, Int) -> Unit
+pub fn cm_set_selection(Int32, Int32, Int32) -> Unit
 
-pub fn cm_undo(Int) -> Unit
+pub fn cm_undo(Int32) -> Unit
 
-pub fn cm_unfold_all(Int) -> Unit
+pub fn cm_unfold_all(Int32) -> Unit
 
 // Errors
 

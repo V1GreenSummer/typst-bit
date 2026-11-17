@@ -6,7 +6,7 @@ import {
 }
 
 import {
-  "V1GreenSummer/typstbit/app" @app,
+  "V1GreenSummer/typstbit/app",
 } for "test"
 
 supported_targets = "all-js"

@@ -8,53 +8,56 @@ import {
 // Values
 pub fn compile_main(String) -> Result[Unit, TypstError]
 
-pub fn error_count(Array[Diagnostic]) -> Int
+pub fn error_count(Array[Diagnostic]) -> Int32
 
 pub fn error_json() -> Result[Array[Diagnostic], TypstError]
 
-pub fn page_count() -> Int
+pub fn page_count() -> Int32
 
-pub fn page_image(Int, Int, Int) -> Result[String, TypstError]
+pub fn page_image(Int32, Int32, Int32) -> Result[String, TypstError]
 
 pub fn parse_diagnostics(String) -> Array[Diagnostic] raise
 
-pub fn pull_registered_text(Int) -> Result[String?, TypstError]
+pub fn pull_registered_text(Int32) -> Result[String?, TypstError]
 
 pub fn utf8_bytes(String) -> Bytes
 
 pub fn utf8_text(Bytes) -> String
 
-pub fn warning_count(Array[Diagnostic]) -> Int
+pub fn warning_count(Array[Diagnostic]) -> Int32
 
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) struct Diagnostic {
   severity : Severity
   message : String
-  line : Int?
-  column : Int?
+  line : Int32?
+  column : Int32?
   file : String?
-} derive(Eq, @debug.Debug)
+}
 pub fn Diagnostic::equal(Self, Self) -> Bool
 pub fn Diagnostic::is_error(Self) -> Bool
 pub fn Diagnostic::not_equal(Self, Self) -> Bool
 pub fn Diagnostic::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Severity {
   Error
   Warning
-} derive(Eq, @debug.Debug)
+}
 pub fn Severity::equal(Self, Self) -> Bool
 pub fn Severity::not_equal(Self, Self) -> Bool
 pub fn Severity::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum TypstError {
   MainNotSet
   CompileErrors
   InvalidArgument
   Fatal(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn TypstError::equal(Self, Self) -> Bool
 pub fn TypstError::not_equal(Self, Self) -> Bool
 pub fn TypstError::to_repr(Self) -> @debug.Repr

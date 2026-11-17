@@ -6,11 +6,11 @@ import {
 }
 
 // Values
-pub fn fresh_state_id() -> Int
+pub fn fresh_state_id() -> Int32
 
 pub let history_field : StateField[HistoryState]
 
-pub let history_max_groups : Int
+pub let history_max_groups : Int32
 
 pub fn redo_spec(EditorState) -> TransactionSpec?
 
@@ -35,12 +35,12 @@ pub fn EditorState::doc(Self) -> @core.Text
 pub fn EditorState::extensions(Self) -> Extension
 pub fn[T] EditorState::facet(Self, Facet[T]) -> T
 pub fn[T] EditorState::field(Self, StateField[T]) -> T
-pub fn EditorState::has_field(Self, Int) -> Bool
-pub fn EditorState::length(Self) -> Int
-pub fn EditorState::line(Self, Int) -> String
-pub fn EditorState::line_count(Self) -> Int
+pub fn EditorState::has_field(Self, Int32) -> Bool
+pub fn EditorState::length(Self) -> Int32
+pub fn EditorState::line(Self, Int32) -> String
+pub fn EditorState::line_count(Self) -> Int32
 pub fn EditorState::selection(Self) -> @core.EditorSelection
-pub fn EditorState::slice(Self, Int, Int) -> String
+pub fn EditorState::slice(Self, Int32, Int32) -> String
 pub fn EditorState::to_string(Self) -> String
 pub fn EditorState::update(Self, TransactionSpec) -> Transaction
 pub fn EditorState::update_doc(Self, @core.Text) -> Self
@@ -54,7 +54,7 @@ pub struct ErasedField {
 }
 
 pub enum ExtItem {
-  FacetValue(Int, () -> Unit, () -> () -> Unit)
+  FacetValue(Int32, () -> Unit, () -> () -> Unit)
   Field(ErasedField)
 }
 
@@ -63,18 +63,18 @@ pub struct Extension {
 }
 pub fn Extension::add(Self, Self) -> Self
 pub fn Extension::empty() -> Self
-pub fn Extension::facet_items(Self) -> Array[(Int, () -> Unit, () -> () -> Unit)]
+pub fn Extension::facet_items(Self) -> Array[(Int32, () -> Unit, () -> () -> Unit)]
 pub fn Extension::fields(Self) -> Array[ErasedField]
 pub fn Extension::items(Self) -> Array[ExtItem]
 pub fn Extension::of(Array[Self]) -> Self
 pub fn Extension::single(ExtItem) -> Self
-pub fn Extension::size(Self) -> Int
+pub fn Extension::size(Self) -> Int32
 pub impl Add for Extension
 
 pub struct Facet[T] {
   // private fields
 }
-pub fn[T] Facet::id(Self[T]) -> Int
+pub fn[T] Facet::id(Self[T]) -> Int32
 pub fn[T] Facet::new(default~ : () -> T, combine~ : (T, T) -> T) -> Self[T]
 pub fn[T] Facet::of(Self[T], T) -> Extension
 pub fn[T] Facet::of_array(Self[T], Array[T]) -> Extension
@@ -85,7 +85,7 @@ pub(all) struct HistoryGroup {
   selection_before : @core.EditorSelection
   selection_after : @core.EditorSelection
   event : String
-  count : Int
+  count : Int32
 }
 
 pub(all) struct HistoryState {
@@ -99,7 +99,7 @@ pub fn HistoryState::empty() -> Self
 pub struct StateEffect[T] {
   // private fields
 }
-pub fn[T] StateEffect::id(Self[T]) -> Int
+pub fn[T] StateEffect::id(Self[T]) -> Int32
 pub fn[T] StateEffect::new() -> Self[T]
 pub fn[T] StateEffect::of(Self[T], T) -> EffectEntry
 
@@ -107,7 +107,7 @@ pub struct StateField[T] {
   // private fields
 }
 pub fn[T] StateField::extension(Self[T]) -> Extension
-pub fn[T] StateField::id(Self[T]) -> Int
+pub fn[T] StateField::id(Self[T]) -> Int32
 pub fn[T] StateField::new(init~ : (EditorState) -> T, update? : (T, Transaction) -> T) -> Self[T]
 
 pub struct Transaction {

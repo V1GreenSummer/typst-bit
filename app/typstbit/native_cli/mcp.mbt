@@ -118,7 +118,7 @@ fn tool_definitions() -> Json {
 }
 
 ///|
-fn mcp_compile(source : String) -> (Int, Int, Array[Json]) {
+fn mcp_compile(source : String) -> (Int32, Int32, Array[Json]) {
   let set_status = typstbit_set_file(utf8("/main.typ"), utf8(source)).to_int()
   if set_status != 0 {
     return (set_status, 0, [])
@@ -139,7 +139,7 @@ fn mcp_compile(source : String) -> (Int, Int, Array[Json]) {
 }
 
 ///|
-fn status_name(code : Int) -> String {
+fn status_name(code : Int32) -> String {
   if code == 0 {
     "ok"
   } else if code == 3 {
@@ -153,7 +153,7 @@ fn status_name(code : Int) -> String {
 fn mcp_call_tool(
   name : String,
   args : Map[String, Json],
-) -> Result[Json, (Int, String)] {
+) -> Result[Json, (Int32, String)] {
   let source = json_str(args, "source").unwrap_or("")
   if name == "typst_outline" {
     let entries = @app.parse_outline(source)
@@ -294,7 +294,7 @@ fn mcp_call_tool(
 fn mcp_dispatch(
   rpc_method : String,
   params : Map[String, Json],
-) -> Result[Json, (Int, String)] {
+) -> Result[Json, (Int32, String)] {
   if rpc_method == "initialize" {
     return Ok(
       Json::object({
@@ -357,7 +357,7 @@ fn mcp_send(message : Json) -> Unit {
 }
 
 ///|
-fn mcp_send_error(id : Json, code : Int, message : String) -> Unit {
+fn mcp_send_error(id : Json, code : Int32, message : String) -> Unit {
   mcp_send(
     Json::object({
       "jsonrpc": Json::string("2.0"),

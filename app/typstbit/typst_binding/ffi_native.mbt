@@ -28,7 +28,7 @@ extern "C" fn typstbind_error_json() -> Bytes = "typstbind_error_json"
 let native_texts : Array[String] = []
 
 ///|
-let native_read_pos : Array[Int] = []
+let native_read_pos : Array[Int32] = []
 
 ///|
 fn native_utf8(text : String) -> Bytes {
@@ -36,7 +36,7 @@ fn native_utf8(text : String) -> Bytes {
 }
 
 ///|
-fn native_set_source(source : String) -> Int {
+fn native_set_source(source : String) -> Int32 {
   let status = typstbind_set_file(native_utf8("/main.typ"), native_utf8(source)).to_int()
   if status != 0 {
     return status
@@ -49,7 +49,7 @@ fn native_set_source(source : String) -> Int {
 }
 
 ///|
-fn typst_compile_main(source_text_id : Int) -> Int {
+fn typst_compile_main(source_text_id : Int32) -> Int32 {
   let index = source_text_id - 1
   if index < 0 || index >= native_texts.length() {
     return 1
@@ -58,31 +58,35 @@ fn typst_compile_main(source_text_id : Int) -> Int {
 }
 
 ///|
-fn typst_page_count() -> Int {
+fn typst_page_count() -> Int32 {
   typstbind_page_count().to_int()
 }
 
 ///|
-fn typst_page_image(_page : Int, _scale_milli : Int, _revision : Int) -> Int {
+fn typst_page_image(
+  _page : Int32,
+  _scale_milli : Int32,
+  _revision : Int32,
+) -> Int32 {
   0
 }
 
 ///|
-fn typst_error_json() -> Int {
+fn typst_error_json() -> Int32 {
   native_texts.push(utf8_text(typstbind_error_json()))
   native_read_pos.push(0)
   native_texts.length()
 }
 
 ///|
-fn typst_begin_create_string() -> Int {
+fn typst_begin_create_string() -> Int32 {
   native_texts.push("")
   native_read_pos.push(0)
   native_texts.length()
 }
 
 ///|
-fn typst_string_append_char(handle : Int, ch : Char) -> Unit {
+fn typst_string_append_char(handle : Int32, ch : Char) -> Unit {
   let index = handle - 1
   if index >= 0 && index < native_texts.length() {
     native_texts[index] = native_texts[index] + ch.to_string()
@@ -90,7 +94,7 @@ fn typst_string_append_char(handle : Int, ch : Char) -> Unit {
 }
 
 ///|
-fn typst_finish_create_string(handle : Int) -> Int {
+fn typst_finish_create_string(handle : Int32) -> Int32 {
   if handle < 1 || handle > native_texts.length() {
     0
   } else {
@@ -99,7 +103,7 @@ fn typst_finish_create_string(handle : Int) -> Int {
 }
 
 ///|
-fn typst_begin_read_string(text_id : Int) -> Int {
+fn typst_begin_read_string(text_id : Int32) -> Int32 {
   if text_id < 1 || text_id > native_texts.length() {
     0
   } else {
@@ -109,7 +113,7 @@ fn typst_begin_read_string(text_id : Int) -> Int {
 }
 
 ///|
-fn typst_string_read_char(handle : Int) -> Int {
+fn typst_string_read_char(handle : Int32) -> Int32 {
   let index = handle - 1
   if index < 0 || index >= native_texts.length() {
     return -1
@@ -124,18 +128,18 @@ fn typst_string_read_char(handle : Int) -> Int {
 }
 
 ///|
-fn typst_finish_read_string(_handle : Int) -> Unit {
+fn typst_finish_read_string(_handle : Int32) -> Unit {
   ()
 }
 
 ///|
 /// Registers a file in the native ABI VFS (multi-file projects).
-pub fn set_file(path : String, data : String) -> Int {
+pub fn set_file(path : String, data : String) -> Int32 {
   typstbind_set_file(native_utf8(path), native_utf8(data)).to_int()
 }
 
 ///|
 /// Registers binary file content in the native ABI VFS.
-pub fn set_file_bytes(path : String, data : Bytes) -> Int {
+pub fn set_file_bytes(path : String, data : Bytes) -> Int32 {
   typstbind_set_file(native_utf8(path), data).to_int()
 }

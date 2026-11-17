@@ -71,13 +71,12 @@ measurement and event plumbing.
 
 ## Requirements and build
 
-The project requires **`moonc` 0.10.14 or newer** (`moon version --all`). The
-stable channel is older, so install the development channel first:
+The project requires **`moonc` 0.10.20 or newer** (`moon version --all`). The
+stable channel is new enough, so no development channel is needed:
 
 ```sh
-export MOONBIT_INSTALL_DEV=1
 curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
-moon version --all   # moonc v0.10.14+...
+moon version --all   # moonc v0.10.20+...
 ```
 
 ```sh

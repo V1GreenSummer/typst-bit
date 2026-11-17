@@ -5,13 +5,15 @@ CodeMoonBit is a CodeMirror-like code editor written in MoonBit, compiled to
 
 ## Toolchain
 
-Requires `moonc >= 0.10.14` (`moon version --all`). The stable channel is
-older; install the development channel with:
+Requires `moonc >= 0.10.20` (`moon version --all`). The stable channel is new
+enough, so no development channel is needed:
 
 ```sh
-export MOONBIT_INSTALL_DEV=1
 curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
 ```
+
+`moonc` 0.10.15 and newer format the 32-bit integer type as `Int32` (`Int`
+remains an alias) and write defaulted optional parameters as `label~`.
 
 ## Build & test
 
@@ -32,8 +34,8 @@ curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
    `moonrun`, which cannot provide custom wasm imports. Only `view`, `editor`
    and `main` may depend on `ffi`.
 2. **Exported wasm functions** (listed in `main/moon.pkg` link exports) may only
-   use `Int`, `Bool`, `Double`, and `#external type JsAny` parameters/results.
-   `String`, arrays and structs are not callable from JS.
+   use `Int`/`Int32`, `Bool`, `Double`, and `#external type JsAny`
+   parameters/results. `String`, arrays and structs are not callable from JS.
 3. **Strings cross the boundary as code units**:
    - MoonBit → JS: `@ffi.JsStringBuilder` (`sb_new`/`sb_push`/`sb_finish`).
    - JS → MoonBit: `@ffi.read_js_string(jsAny)`.

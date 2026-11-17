@@ -41,7 +41,10 @@ test "project: json round trip" {
   project.add_file("/lib.typ", "#let x = 1") |> ignore
   project.add_folder("/images") |> ignore
   project.active = "/lib.typ"
-  let restored = @app.Project::from_json_string(project.to_json_string(), "fallback")
+  let restored = @app.Project::from_json_string(
+    project.to_json_string(),
+    "fallback",
+  )
   assert_eq(restored, project)
   let broken = @app.Project::from_json_string("{not json", "fallback")
   assert_eq(broken.active, "/main.typ")

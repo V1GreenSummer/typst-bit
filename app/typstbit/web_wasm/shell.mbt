@@ -20,23 +20,25 @@
 ///|
 /// Fixed render scale for v1: 1.5 px per pt. The preview panel scales the
 /// texture to fit (MoUI image fit=Contain), so this only affects sharpness.
-const PREVIEW_SCALE_MILLI : Int = 1500
+const PREVIEW_SCALE_MILLI : Int32 = 1500
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct ShellModel {
   model : @app.Model
   /// Compile issued (StartCompile seen), awaiting the paint callback.
-  compile_tag : Int?
+  compile_tag : Int32?
   /// Source of the in-flight compile.
   compile_source : String
-} derive(Debug, Eq)
+}
 
 ///|
+#derive(Debug, Eq)
 pub(all) enum ShellMsg {
   App(@app.Msg)
-  PaintReady(tag~ : Int)
+  PaintReady(tag~ : Int32)
   Noop
-} derive(Debug, Eq)
+}
 
 ///|
 let shell_dispatch : Ref[((ShellMsg) -> Unit)?] = Ref(None)
@@ -51,14 +53,14 @@ let shell_model_ref : Ref[ShellModel] = Ref({
 
 ///|
 /// Host clock reading; textbox edits use it as their timestamp.
-fn clock_now_ms() -> Int {
+fn clock_now_ms() -> Int32 {
   extern_typstbit_now_ms()
 }
 
 ///|
 /// Shell-side host callback: the loader calls this after rAF x 2
 /// (design D4 paint schedule). Runs the synchronous compile.
-pub fn typstbit_paint_ready(tag : Int) -> Unit {
+pub fn typstbit_paint_ready(tag : Int32) -> Unit {
   match shell_dispatch.val {
     Some(dispatch) => dispatch(PaintReady(tag~))
     None => ()
@@ -68,7 +70,7 @@ pub fn typstbit_paint_ready(tag : Int) -> Unit {
 ///|
 /// Loader callback: an image load settled (status 0 = ready, 1 = failed),
 /// bound to a compile revision. The state machine drops stale revisions.
-pub fn typst_image_event(revision : Int, status : Int) -> Unit {
+pub fn typst_image_event(revision : Int32, status : Int32) -> Unit {
   match shell_dispatch.val {
     Some(dispatch) => {
       let msg = if status == 0 {
@@ -137,10 +139,10 @@ fn shell_update(
 /// Monotonic count of transitions into the Compiling state (e2e: the D4
 /// schedule guarantees the Compiling view is painted — via after_paint's
 /// rAF x 2 — before the synchronous compile runs).
-let compiling_count : Ref[Int] = Ref(0)
+let compiling_count : Ref[Int32] = Ref(0)
 
 ///|
-pub fn e2e_compiling_count() -> Int {
+pub fn e2e_compiling_count() -> Int32 {
   compiling_count.val
 }
 
@@ -158,7 +160,7 @@ fn apply_actions(
         // in PaintReady. A still-pending schedule is re-armed (newest
         // revision wins; stale callbacks are ignored via compile_tag).
         extern_typstbit_after_paint(revision)
-        next = { ..next, compile_tag: Some(revision), compile_source: source }
+        next = { ..next, compile_tag: Some(revision), compile_source: source, }
       }
       RequestPageImage(revision~, page~) => {
         let (model, _) = @app.update(
@@ -175,7 +177,7 @@ fn apply_actions(
 ///|
 /// Request a page image and wrap the outcome as the matching state
 /// machine message.
-fn request_page_image(revision : Int, page : Int) -> @app.Msg {
+fn request_page_image(revision : Int32, page : Int32) -> @app.Msg {
   match @typst_binding.page_image(page, PREVIEW_SCALE_MILLI, revision) {
     Ok(url) => @app.PreviewSource(revision~, page~, source=url)
     Err(_) => @app.PreviewFailed(revision~, page~)
@@ -186,8 +188,8 @@ fn request_page_image(revision : Int, page : Int) -> @app.Msg {
 /// Execute the synchronous compile for `revision` (design D4: called only
 /// after the Compiling state was painted) and feed the result into the
 /// state machine.
-fn run_compile(shell : ShellModel, revision : Int) -> ShellModel {
-  let cleared : ShellModel = { ..shell, compile_tag: None, compile_source: "" }
+fn run_compile(shell : ShellModel, revision : Int32) -> ShellModel {
+  let cleared : ShellModel = { ..shell, compile_tag: None, compile_source: "", }
   match @typst_binding.compile_main(shell.compile_source) {
     Ok(_) => {
       let pages = @typst_binding.page_count()
@@ -251,24 +253,24 @@ fn shell_view(shell : ShellModel) -> @moui.View[ShellMsg] {
 // ---------------------------------------------------------------------------
 
 ///|
-extern "wasm" fn extern_typstbit_after_paint(tag : Int) -> Unit = "typstbit" "after_paint"
+extern "wasm" fn extern_typstbit_after_paint(tag : Int32) -> Unit = "typstbit" "after_paint"
 
 ///|
-extern "wasm" fn extern_typstbit_now_ms() -> Int = "typstbit" "now_ms"
+extern "wasm" fn extern_typstbit_now_ms() -> Int32 = "typstbit" "now_ms"
 
 ///|
 extern "wasm" fn extern_typstbit_schedule_timeout(
-  delay_ms : Int,
-  tag : Int,
+  delay_ms : Int32,
+  tag : Int32,
 ) -> Unit = "typstbit" "schedule_timeout"
 
 ///|
 /// Debounce timer tag (one outstanding timeout; re-armed per edit).
-const TIMER_TAG_DEBOUNCE : Int = 0
+const TIMER_TAG_DEBOUNCE : Int32 = 0
 
 ///|
 /// Loader callback: a one-shot timer fired. Tag 0 is the debounce tick.
-pub fn typstbit_timer(tag : Int, now_ms : Int) -> Unit {
+pub fn typstbit_timer(tag : Int32, now_ms : Int32) -> Unit {
   match shell_dispatch.val {
     Some(dispatch) =>
       if tag == TIMER_TAG_DEBOUNCE {
@@ -291,7 +293,7 @@ fn arm_debounce_timer() -> Unit {
 
 ///|
 /// e2e: compile status. 0 idle, 1 compiling, 2 success, 3 failed.
-pub fn e2e_status() -> Int {
+pub fn e2e_status() -> Int32 {
   match shell_model_ref.val.model.status {
     Idle => 0
     Compiling => 1
@@ -301,17 +303,17 @@ pub fn e2e_status() -> Int {
 }
 
 ///|
-pub fn e2e_page_count() -> Int {
+pub fn e2e_page_count() -> Int32 {
   shell_model_ref.val.model.page_count
 }
 
 ///|
-pub fn e2e_current_page() -> Int {
+pub fn e2e_current_page() -> Int32 {
   shell_model_ref.val.model.current_page
 }
 
 ///|
-pub fn e2e_preview_ready() -> Int {
+pub fn e2e_preview_ready() -> Int32 {
   if shell_model_ref.val.model.preview_ready {
     1
   } else {
@@ -320,19 +322,19 @@ pub fn e2e_preview_ready() -> Int {
 }
 
 ///|
-pub fn e2e_revision() -> Int {
+pub fn e2e_revision() -> Int32 {
   shell_model_ref.val.model.current_revision
 }
 
 ///|
-pub fn e2e_error_count() -> Int {
+pub fn e2e_error_count() -> Int32 {
   shell_model_ref.val.model.diagnostics.filter(d => d.is_error()).length()
 }
 
 ///|
 /// e2e: dispatch a source edit using a text id registered in the loader's
 /// typst table (the same path a production editor value would take).
-pub fn e2e_set_source(text_id : Int) -> Unit {
+pub fn e2e_set_source(text_id : Int32) -> Unit {
   match shell_dispatch.val {
     Some(dispatch) =>
       match @typst_binding.pull_registered_text(text_id) {
@@ -347,7 +349,7 @@ pub fn e2e_set_source(text_id : Int) -> Unit {
 ///|
 /// e2e: 1 when the current source contains the registered text (IME
 /// commit verification: submitted text must arrive completely).
-pub fn e2e_source_contains(text_id : Int) -> Int {
+pub fn e2e_source_contains(text_id : Int32) -> Int32 {
   match shell_dispatch.val {
     Some(_) =>
       match @typst_binding.pull_registered_text(text_id) {
@@ -365,7 +367,7 @@ pub fn e2e_source_contains(text_id : Int) -> Int {
 
 ///|
 /// e2e: turn the page (0 = prev, 1 = next).
-pub fn e2e_turn_page(direction : Int) -> Unit {
+pub fn e2e_turn_page(direction : Int32) -> Unit {
   match shell_dispatch.val {
     Some(dispatch) => {
       let msg = if direction == 0 { @app.PrevPage } else { @app.NextPage }

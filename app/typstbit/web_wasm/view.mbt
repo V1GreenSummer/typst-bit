@@ -406,13 +406,13 @@ fn status_detail(model : @app.Model) -> String {
 }
 
 ///|
-fn count_lines(source : String) -> Int {
+fn count_lines(source : String) -> Int32 {
   let lines = source.split("\n")
   lines.length()
 }
 
 ///|
-fn make_line_numbers(count : Int) -> String {
+fn make_line_numbers(count : Int32) -> String {
   if count <= 0 {
     return ""
   }

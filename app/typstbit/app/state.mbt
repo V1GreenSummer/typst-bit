@@ -14,7 +14,7 @@
 
 ///|
 /// Debounce window in milliseconds (spec: "停止编辑一段防抖窗口时间后").
-pub const DEBOUNCE_MS : Int = 300
+pub const DEBOUNCE_MS : Int32 = 300
 
 ///|
 /// Starter document used by the web shell's new-document action.
@@ -22,6 +22,7 @@ pub const DEFAULT_SOURCE : String = "#set page(width: 20cm, height: 10cm)\n= Hel
 
 ///|
 /// Compile status shown in the status bar.
+#derive(Debug, Eq)
 pub(all) enum CompileStatus {
   /// Initial state; nothing compiled yet.
   Idle
@@ -29,10 +30,10 @@ pub(all) enum CompileStatus {
   Compiling
   /// Last compile succeeded: page count and warning count of the last
   /// good document.
-  Success(pages~ : Int, warnings~ : Int)
+  Success(pages~ : Int32, warnings~ : Int32)
   /// Last compile failed: error and warning counts of the failed compile.
-  Failed(errors~ : Int, warnings~ : Int)
-} derive(Debug, Eq)
+  Failed(errors~ : Int32, warnings~ : Int32)
+}
 
 ///|
 pub extend CompileStatus with @moonbitlang/core/debug.Debug::{to_repr}
@@ -42,16 +43,17 @@ pub extend CompileStatus with Eq::{not_equal, equal}
 
 ///|
 /// Side effects the shell must perform after `update`.
+#derive(Debug, Eq)
 pub(all) enum Action {
   /// Enter the D4 paint schedule: render the Compiling state, wait two
   /// animation frames, then call `typst.compile_main(source)`; report the
   /// result back as `CompileSucceeded`/`CompileFailed(revision, ...)`.
-  StartCompile(revision~ : Int, source~ : String)
+  StartCompile(revision~ : Int32, source~ : String)
   /// Call `typst.page_image(page, scale, revision)` (scale chosen by the
   /// shell from the preview panel size) and report the URL back as
   /// `PreviewSource`.
-  RequestPageImage(revision~ : Int, page~ : Int)
-} derive(Debug, Eq)
+  RequestPageImage(revision~ : Int32, page~ : Int32)
+}
 
 ///|
 pub extend Action with @moonbitlang/core/debug.Debug::{to_repr}
@@ -60,25 +62,26 @@ pub extend Action with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend Action with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct Model {
   /// Current source text (what the textbox shows).
   source : String
   /// True when an edit is inside the debounce window.
   pending : Bool
   /// Debounce deadline in ms; valid while `pending`.
-  deadline : Int
+  deadline : Int32
   /// Latest issued compile revision (monotonic; bumped per compile).
-  current_revision : Int
+  current_revision : Int32
   /// Revision of the document backing the preview (last good compile).
-  doc_revision : Int?
+  doc_revision : Int32?
   /// Page count of the last good document (0 when none).
-  page_count : Int
+  page_count : Int32
   /// 0-based index of the page being previewed.
-  current_page : Int
+  current_page : Int32
   /// Image source (blob URL) of the preview, if any.
   preview_source : String?
   /// Page whose image was requested and is awaited (stale URLs dropped).
-  pending_image_page : Int?
+  pending_image_page : Int32?
   /// Whether the preview image finished loading (texture ready).
   preview_ready : Bool
   /// Whether the last page_image request failed.
@@ -87,7 +90,7 @@ pub(all) struct Model {
   /// Narrow diagnostics of the last compile (errors on failure, warnings
   /// on success — used for the error list / status bar counts).
   diagnostics : Array[@typst_binding.Diagnostic]
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend Model with @moonbitlang/core/debug.Debug::{to_repr}
@@ -97,35 +100,36 @@ pub extend Model with Eq::{not_equal, equal}
 
 ///|
 /// Messages into the state machine.
+#derive(Debug, Eq)
 pub(all) enum Msg {
   /// The textbox content changed at time `now_ms`.
-  SourceEdited(source~ : String, now_ms~ : Int)
+  SourceEdited(source~ : String, now_ms~ : Int32)
   /// Clock tick; fires the compile when the debounce window expires.
-  DebounceTick(now_ms~ : Int)
+  DebounceTick(now_ms~ : Int32)
   /// Compile immediately, bypassing the debounce window.
   CompileNow
   /// Restore the starter document and schedule a fresh compile.
-  ResetSource(now_ms~ : Int)
+  ResetSource(now_ms~ : Int32)
   /// A compile finished successfully.
-  CompileSucceeded(revision~ : Int, page_count~ : Int, warnings~ : Int)
+  CompileSucceeded(revision~ : Int32, page_count~ : Int32, warnings~ : Int32)
   /// A compile failed.
   CompileFailed(
-    revision~ : Int,
+    revision~ : Int32,
     diagnostics~ : Array[@typst_binding.Diagnostic]
   )
   /// `page_image` returned an image source for the requested page.
-  PreviewSource(revision~ : Int, page~ : Int, source~ : String)
+  PreviewSource(revision~ : Int32, page~ : Int32, source~ : String)
   /// `page_image` failed.
-  PreviewFailed(revision~ : Int, page~ : Int)
+  PreviewFailed(revision~ : Int32, page~ : Int32)
   /// The image of the given revision finished loading (loader callback,
   /// `typst_image_event`; also the Spike C re-render trigger).
-  ImageReady(revision~ : Int)
+  ImageReady(revision~ : Int32)
   /// The image of the given revision failed to load.
-  ImageFailed(revision~ : Int)
+  ImageFailed(revision~ : Int32)
   PrevPage
   NextPage
-  GotoPage(page~ : Int)
-} derive(Debug, Eq)
+  GotoPage(page~ : Int32)
+}
 
 ///|
 pub extend Msg with @moonbitlang/core/debug.Debug::{to_repr}
@@ -229,7 +233,7 @@ pub fn update(model : Model, msg : Msg) -> (Model, Array[Action]) {
       let warnings = @typst_binding.warning_count(diagnostics)
       // Last-good preview (doc_revision, page_count, preview_source)
       // is intentionally retained (spec: 编译错误呈现).
-      let next = { ..model, status: Failed(errors~, warnings~), diagnostics }
+      let next = { ..model, status: Failed(errors~, warnings~), diagnostics, }
       (next, [])
     }
     PreviewSource(revision~, page~, source~) => {
@@ -253,20 +257,20 @@ pub fn update(model : Model, msg : Msg) -> (Model, Array[Action]) {
       if !accepted {
         return (model, [])
       }
-      let next = { ..model, pending_image_page: None, preview_failed: true }
+      let next = { ..model, pending_image_page: None, preview_failed: true, }
       (next, [])
     }
     ImageReady(revision~) =>
       if model.doc_revision == Some(revision) {
         // The view must change so MoUI re-renders the finished texture
         // (Spike C: no automatic re-render on image load).
-        ({ ..model, preview_ready: true, preview_failed: false }, [])
+        ({ ..model, preview_ready: true, preview_failed: false, }, [])
       } else {
         (model, [])
       }
     ImageFailed(revision~) =>
       if model.doc_revision == Some(revision) {
-        ({ ..model, preview_ready: false, preview_failed: true }, [])
+        ({ ..model, preview_ready: false, preview_failed: true, }, [])
       } else {
         (model, [])
       }
@@ -295,7 +299,7 @@ pub fn update(model : Model, msg : Msg) -> (Model, Array[Action]) {
 ///|
 /// Navigate to `page` (clamped to the document bounds) and request its
 /// image. No-op (no action) when the page does not change.
-fn goto_page(model : Model, page : Int) -> (Model, Array[Action]) {
+fn goto_page(model : Model, page : Int32) -> (Model, Array[Action]) {
   let clamped = if page < 0 {
     0
   } else if page >= model.page_count {

@@ -16,10 +16,11 @@
 // with stub JSON fixtures.
 
 ///|
+#derive(Debug, Eq)
 pub(all) enum Severity {
   Error
   Warning
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend Severity with @moonbitlang/core/debug.Debug::{to_repr}
@@ -29,15 +30,16 @@ pub extend Severity with Eq::{not_equal, equal}
 
 ///|
 /// One diagnostic in the narrow presentation model.
+#derive(Debug, Eq)
 pub(all) struct Diagnostic {
   severity : Severity
   message : String
   /// 1-based line of the diagnostic start; `None` for positionless
   /// diagnostics.
-  line : Int?
-  column : Int?
+  line : Int32?
+  column : Int32?
   file : String?
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend Diagnostic with @moonbitlang/core/debug.Debug::{to_repr}
@@ -97,13 +99,13 @@ pub fn Diagnostic::is_error(self : Diagnostic) -> Bool {
 
 ///|
 /// Number of error-level diagnostics.
-pub fn error_count(diags : Array[Diagnostic]) -> Int {
+pub fn error_count(diags : Array[Diagnostic]) -> Int32 {
   diags.filter(d => d.is_error()).length()
 }
 
 ///|
 /// Number of warning-level diagnostics.
-pub fn warning_count(diags : Array[Diagnostic]) -> Int {
+pub fn warning_count(diags : Array[Diagnostic]) -> Int32 {
   diags.filter(d => d.severity is Warning).length()
 }
 
@@ -116,7 +118,7 @@ fn get_string(map : Map[String, Json], key : String) -> String? {
 }
 
 ///|
-fn get_int(map : Map[String, Json], key : String) -> Int? {
+fn get_int(map : Map[String, Json], key : String) -> Int32? {
   match map.get(key) {
     Some(Number(value, ..)) => Some(value.to_int())
     _ => None

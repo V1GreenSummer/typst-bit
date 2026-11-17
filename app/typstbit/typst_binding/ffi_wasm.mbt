@@ -10,35 +10,35 @@
 // finish_read_string.
 
 ///|
-extern "wasm" fn typst_compile_main(source_text_id : Int) -> Int = "typst" "compile_main"
+extern "wasm" fn typst_compile_main(source_text_id : Int32) -> Int32 = "typst" "compile_main"
 
 ///|
-extern "wasm" fn typst_page_count() -> Int = "typst" "page_count"
+extern "wasm" fn typst_page_count() -> Int32 = "typst" "page_count"
 
 ///|
 extern "wasm" fn typst_page_image(
-  page : Int,
-  scale_milli : Int,
-  revision : Int,
-) -> Int = "typst" "page_image"
+  page : Int32,
+  scale_milli : Int32,
+  revision : Int32,
+) -> Int32 = "typst" "page_image"
 
 ///|
-extern "wasm" fn typst_error_json() -> Int = "typst" "error_json"
+extern "wasm" fn typst_error_json() -> Int32 = "typst" "error_json"
 
 ///|
-extern "wasm" fn typst_begin_create_string() -> Int = "typst" "begin_create_string"
+extern "wasm" fn typst_begin_create_string() -> Int32 = "typst" "begin_create_string"
 
 ///|
-extern "wasm" fn typst_string_append_char(handle : Int, ch : Char) -> Unit = "typst" "string_append_char"
+extern "wasm" fn typst_string_append_char(handle : Int32, ch : Char) -> Unit = "typst" "string_append_char"
 
 ///|
-extern "wasm" fn typst_finish_create_string(handle : Int) -> Int = "typst" "finish_create_string"
+extern "wasm" fn typst_finish_create_string(handle : Int32) -> Int32 = "typst" "finish_create_string"
 
 ///|
-extern "wasm" fn typst_begin_read_string(text_id : Int) -> Int = "typst" "begin_read_string"
+extern "wasm" fn typst_begin_read_string(text_id : Int32) -> Int32 = "typst" "begin_read_string"
 
 ///|
-extern "wasm" fn typst_string_read_char(handle : Int) -> Int = "typst" "string_read_char"
+extern "wasm" fn typst_string_read_char(handle : Int32) -> Int32 = "typst" "string_read_char"
 
 ///|
-extern "wasm" fn typst_finish_read_string(handle : Int) -> Unit = "typst" "finish_read_string"
+extern "wasm" fn typst_finish_read_string(handle : Int32) -> Unit = "typst" "finish_read_string"

@@ -6,11 +6,12 @@
 // application core and is shared by the browser shell and CLI.
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct OutlineEntry {
-  level : Int
+  level : Int32
   title : String
-  line : Int
-} derive(Debug, Eq)
+  line : Int32
+}
 
 ///|
 pub extend OutlineEntry with @moonbitlang/core/debug.Debug::{to_repr}

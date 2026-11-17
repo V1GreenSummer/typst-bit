@@ -6,7 +6,7 @@ pub fn add_class(JsAny, JsAny) -> Unit
 
 pub fn append(JsAny, JsAny) -> Unit
 
-pub fn attach(JsAny, Int) -> Unit
+pub fn attach(JsAny, Int32) -> Unit
 
 pub fn blur(JsAny) -> Unit
 
@@ -24,9 +24,9 @@ pub fn get_html(JsAny) -> JsAny
 
 pub fn get_text(JsAny) -> JsAny
 
-pub fn js_char(JsAny, Int) -> Int
+pub fn js_char(JsAny, Int32) -> Int32
 
-pub fn js_len(JsAny) -> Int
+pub fn js_len(JsAny) -> Int32
 
 pub fn js_string(String) -> JsAny
 
@@ -38,13 +38,13 @@ pub fn measure_text(String, String) -> Double
 
 pub fn measure_width(JsAny, JsAny) -> Double
 
-pub fn notify_update(Int) -> Unit
+pub fn notify_update(Int32) -> Unit
 
 pub fn part(JsAny, JsAny) -> JsAny
 
-pub fn push_js_string(Int, JsAny) -> Unit
+pub fn push_js_string(Int32, JsAny) -> Unit
 
-pub fn push_string(Int, String) -> Unit
+pub fn push_string(Int32, String) -> Unit
 
 pub fn read_js_string(JsAny) -> String
 
@@ -52,17 +52,17 @@ pub fn remove_attr(JsAny, JsAny) -> Unit
 
 pub fn remove_class(JsAny, JsAny) -> Unit
 
-pub fn request_measure(Int) -> Unit
+pub fn request_measure(Int32) -> Unit
 
-pub fn sb_clear(Int) -> Unit
+pub fn sb_clear(Int32) -> Unit
 
-pub fn sb_finish(Int) -> JsAny
+pub fn sb_finish(Int32) -> JsAny
 
-pub fn sb_new() -> Int
+pub fn sb_new() -> Int32
 
-pub fn sb_push(Int, Int) -> Unit
+pub fn sb_push(Int32, Int32) -> Unit
 
-pub fn sb_push_js(Int, JsAny) -> Unit
+pub fn sb_push_js(Int32, JsAny) -> Unit
 
 pub fn scroll_height(JsAny) -> Double
 
@@ -76,7 +76,7 @@ pub fn set_attr(JsAny, JsAny, JsAny) -> Unit
 
 pub fn set_class(JsAny, JsAny) -> Unit
 
-pub fn set_cursor(JsAny, Double, Double, Double, Int) -> Unit
+pub fn set_cursor(JsAny, Double, Double, Double, Int32) -> Unit
 
 pub fn set_html(JsAny, JsAny) -> Unit
 
@@ -100,7 +100,7 @@ pub fn JsStringBuilder::finish(Self) -> JsAny
 pub fn JsStringBuilder::new() -> Self
 pub fn JsStringBuilder::push(Self, String) -> Unit
 pub fn JsStringBuilder::push_char(Self, Char) -> Unit
-pub fn JsStringBuilder::push_code(Self, Int) -> Unit
+pub fn JsStringBuilder::push_code(Self, Int32) -> Unit
 pub fn JsStringBuilder::push_js(Self, JsAny) -> Unit
 
 // Type aliases

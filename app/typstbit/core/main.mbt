@@ -11,7 +11,7 @@ fn op_string(map : Map[String, Json], key : String) -> String? {
 }
 
 ///|
-fn op_int(map : Map[String, Json], key : String) -> Int? {
+fn op_int(map : Map[String, Json], key : String) -> Int32? {
   match map.get(key) {
     Some(Json::Number(value, ..)) => Some(value.to_int())
     _ => None

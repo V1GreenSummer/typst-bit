@@ -60,13 +60,12 @@
 
 ## 环境要求与构建
 
-项目要求 **`moonc` 0.10.14 及以上**（用 `moon version --all` 查看）。
-stable 通道版本低于该要求，请先安装 dev 通道：
+项目要求 **`moonc` 0.10.20 及以上**（用 `moon version --all` 查看）。
+stable 通道已经满足该要求，不需要再装 dev 通道：
 
 ```sh
-export MOONBIT_INSTALL_DEV=1
 curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
-moon version --all   # 应显示 moonc v0.10.14+...
+moon version --all   # 应显示 moonc v0.10.20+...
 ```
 
 ```sh

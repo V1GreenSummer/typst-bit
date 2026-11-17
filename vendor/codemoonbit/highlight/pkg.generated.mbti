@@ -121,30 +121,32 @@ pub fn yaml_language() -> Language
 pub struct HighlightCache {
   // private fields
 }
-pub fn HighlightCache::invalidate(Self, Int) -> Unit
+pub fn HighlightCache::invalidate(Self, Int32) -> Unit
 pub fn HighlightCache::new(Language) -> Self
-pub fn HighlightCache::tokens_and_state_for_line(Self, @core.Text, Int) -> (Int, Array[Token])
-pub fn HighlightCache::tokens_for_line(Self, @core.Text, Int) -> Array[Token]
+pub fn HighlightCache::tokens_and_state_for_line(Self, @core.Text, Int32) -> (Int32, Array[Token])
+pub fn HighlightCache::tokens_for_line(Self, @core.Text, Int32) -> Array[Token]
 
 pub struct Language {
   // private fields
 }
 pub fn Language::block_comment(Self) -> (String, String)?
 pub fn Language::brackets(Self) -> Array[(String, String)]
-pub fn Language::indent(Self, String, Int, Int) -> Int
+pub fn Language::indent(Self, String, Int32, Int32) -> Int32
 pub fn Language::line_comment(Self) -> String?
 pub fn Language::name(Self) -> String
-pub fn Language::tokenize(Self, String, Int) -> (Array[Token], Int)
+pub fn Language::tokenize(Self, String, Int32) -> (Array[Token], Int32)
 
+#derive(Eq, @debug.Debug)
 pub struct Token {
-  from : Int
-  to : Int
+  from : Int32
+  to : Int32
   typ : TokenType
-} derive(Eq, @debug.Debug)
+}
 pub fn Token::equal(Self, Self) -> Bool
 pub fn Token::not_equal(Self, Self) -> Bool
 pub fn Token::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, Hash, @debug.Debug)
 pub enum TokenType {
   Keyword
   TypeName
@@ -160,9 +162,9 @@ pub enum TokenType {
   Tag
   Attribute
   Invalid
-} derive(Eq, Hash, @debug.Debug)
+}
 pub fn TokenType::equal(Self, Self) -> Bool
-pub fn TokenType::hash(Self) -> Int
+pub fn TokenType::hash(Self) -> Int32
 pub fn TokenType::hash_combine(Self, Hasher) -> Unit
 pub fn TokenType::not_equal(Self, Self) -> Bool
 pub fn TokenType::to_repr(Self) -> @debug.Repr

@@ -8,6 +8,7 @@
 
 ///|
 /// Host-level failures surfaced by the typed API.
+#derive(Debug, Eq)
 pub(all) enum TypstError {
   /// The main file was not set or is missing from the VFS (E_MAIN_NOT_SET).
   MainNotSet
@@ -19,7 +20,7 @@ pub(all) enum TypstError {
   /// Unexpected host behavior (unknown status, text protocol failure).
   /// The loader treats this class as fatal (design D9).
   Fatal(String)
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend TypstError with @moonbitlang/core/debug.Debug::{to_repr}
@@ -29,7 +30,7 @@ pub extend TypstError with Eq::{not_equal, equal}
 
 ///|
 /// Push `text` to the host's persistent typst table; returns its text id.
-fn push_text(text : String) -> Result[Int, TypstError] {
+fn push_text(text : String) -> Result[Int32, TypstError] {
   let handle = typst_begin_create_string()
   for i in 0..<text.length() {
     typst_string_append_char(handle, text.code_unit_at(i).unsafe_to_char())
@@ -45,7 +46,7 @@ fn push_text(text : String) -> Result[Int, TypstError] {
 ///|
 /// Pull the string registered under `text_id`; `None` when the id is 0
 /// (the ABI's "no value" convention).
-fn pull_text(text_id : Int) -> Result[String?, TypstError] {
+fn pull_text(text_id : Int32) -> Result[String?, TypstError] {
   if text_id == 0 {
     return Ok(None)
   }
@@ -66,7 +67,7 @@ fn pull_text(text_id : Int) -> Result[String?, TypstError] {
 }
 
 ///|
-fn status_to_error(status : Int) -> TypstError {
+fn status_to_error(status : Int32) -> TypstError {
   match status {
     1 => InvalidArgument
     2 => MainNotSet
@@ -94,7 +95,7 @@ pub fn compile_main(source : String) -> Result[Unit, TypstError] {
 
 ///|
 /// Page count of the last successful compile; 0 when there is none.
-pub fn page_count() -> Int {
+pub fn page_count() -> Int32 {
   let n = typst_page_count()
   if n < 0 {
     0
@@ -109,9 +110,9 @@ pub fn page_count() -> Int {
 /// blob: URL registered by the loader). The app must only accept results
 /// whose revision is still current (design D3).
 pub fn page_image(
-  page : Int,
-  scale_milli : Int,
-  revision : Int,
+  page : Int32,
+  scale_milli : Int32,
+  revision : Int32,
 ) -> Result[String, TypstError] {
   let text_id = typst_page_image(page, scale_milli, revision)
   if text_id == 0 {
@@ -145,6 +146,6 @@ pub fn error_json() -> Result[Array[Diagnostic], TypstError] {
 ///|
 /// Debug/e2e helper: pull the string registered under `text_id` in the
 /// loader's persistent typst table. `Ok(None)` when the id is 0.
-pub fn pull_registered_text(text_id : Int) -> Result[String?, TypstError] {
+pub fn pull_registered_text(text_id : Int32) -> Result[String?, TypstError] {
   pull_text(text_id)
 }

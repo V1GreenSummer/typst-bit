@@ -6,12 +6,13 @@
 // the bytes through the ABI.
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct PackageSpec {
   ns : String
   name : String
   version : String
   text : String
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend PackageSpec with @moonbitlang/core/debug.Debug::{to_repr}
@@ -30,7 +31,7 @@ fn spec_digit(c : Char) -> Bool {
 }
 
 ///|
-fn chars_string(chars : Array[Char], from : Int, to : Int) -> String {
+fn chars_string(chars : Array[Char], from : Int32, to : Int32) -> String {
   let buf = StringBuilder()
   let end = if to > chars.length() { chars.length() } else { to }
   let mut i = from
@@ -43,7 +44,7 @@ fn chars_string(chars : Array[Char], from : Int, to : Int) -> String {
 
 ///|
 /// Parses `@namespace/name:major.minor.patch` at `chars[start..]`.
-pub fn parse_spec_at(chars : Array[Char], start : Int) -> PackageSpec? {
+pub fn parse_spec_at(chars : Array[Char], start : Int32) -> PackageSpec? {
   let n = chars.length()
   if start < 0 || start >= n || chars[start] != '@' {
     return None
@@ -86,7 +87,7 @@ pub fn parse_spec_at(chars : Array[Char], start : Int) -> PackageSpec? {
     }
   }
   let version = "\{parts[0]}.\{parts[1]}.\{parts[2]}"
-  Some({ ns, name, version, text: "@\{ns}/\{name}:\{version}" })
+  Some({ ns, name, version, text: "@\{ns}/\{name}:\{version}", })
 }
 
 ///|

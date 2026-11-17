@@ -1,5 +1,6 @@
 ///|
 /// The syntactic class of a highlighted span.
+#derive(Eq, Hash, Debug)
 pub enum TokenType {
   Keyword
   TypeName
@@ -15,7 +16,7 @@ pub enum TokenType {
   Tag
   Attribute
   Invalid
-} derive(Eq, Hash, Debug)
+}
 
 ///|
 pub extend TokenType with Eq::{not_equal, equal}
@@ -28,11 +29,12 @@ pub extend TokenType with Debug::{to_repr}
 
 ///|
 /// A highlighted span of a single line, in line-relative UTF-16 code units.
+#derive(Eq, Debug)
 pub struct Token {
-  from : Int
-  to : Int
+  from : Int32
+  to : Int32
   typ : TokenType
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Token with Eq::{not_equal, equal}

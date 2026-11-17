@@ -41,7 +41,7 @@ extern "C" fn typstbit_render_page_png(
 ) -> Bytes = "typstbit_render_page_png"
 
 ///|
-extern "C" fn exit(code : Int) -> Unit = "exit"
+extern "C" fn exit(code : Int32) -> Unit = "exit"
 
 ///|
 let text_ext : Array[String] = [".typ", ".txt", ".md", ".csv", ".json"]
@@ -247,7 +247,7 @@ fn register_package_entry(dir : String, fields : Map[String, Json]) -> Unit {
 
 ///|
 fn walk(dir : String, base : String, out : Array[(String, String)]) -> Unit {
-  let entries : Array[String] = @fs.read_dir(dir) catch { _ => [] }
+  let entries : Array[String] = @fs.read_dir(dir).to_owned() catch { _ => [] }
   entries.sort()
   for entry in entries {
     let name = path_basename(entry)
@@ -278,7 +278,7 @@ fn replace_typ_ext(path : String, ext : String) -> String {
 }
 
 ///|
-fn report_diagnostics() -> Int {
+fn report_diagnostics() -> Int32 {
   let text = bytes_to_utf16(typstbit_error_json())
   let mut count = 0
   match parse_object(text) {

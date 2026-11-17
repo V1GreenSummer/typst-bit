@@ -5,7 +5,7 @@
 
 ///|
 priv struct NativeSmokeModel {
-  count : Int
+  count : Int32
 }
 
 ///|
@@ -30,11 +30,11 @@ fn native_smoke_view(model : NativeSmokeModel) -> @views.View[NativeSmokeMsg] {
 fn main {
   let runtime = @runtime.new_program_with_dimensions(
     program=@moui.Program::simple(
-      init={ count: 0 },
+      init={ count: 0, },
       update=(model, msg) => {
         match msg {
-          Increment => { count: model.count + 1 }
-          Reset => { count: 0 }
+          Increment => { count: model.count + 1, }
+          Reset => { count: 0, }
         }
       },
       view=native_smoke_view,

@@ -52,9 +52,9 @@ test "filter commands by label, id and category" {
 ///|
 test "wrap markers drive the active state" {
   let bold = @app.find_command(@app.default_commands(), "bold").unwrap()
-  assert_true(bold.is_active({ doc: "*hi*", sel_from: 1, sel_to: 3 }))
-  assert_false(bold.is_active({ doc: "*hi*", sel_from: 0, sel_to: 2 }))
-  assert_false(bold.is_active({ doc: "*hi*", sel_from: 1, sel_to: 1 }))
+  assert_true(bold.is_active({ doc: "*hi*", sel_from: 1, sel_to: 3, }))
+  assert_false(bold.is_active({ doc: "*hi*", sel_from: 0, sel_to: 2, }))
+  assert_false(bold.is_active({ doc: "*hi*", sel_from: 1, sel_to: 1, }))
 }
 
 ///|
@@ -62,20 +62,20 @@ test "line prefixes drive the active state" {
   let commands = @app.default_commands()
   let heading = @app.find_command(commands, "heading").unwrap()
   let list = @app.find_command(commands, "list").unwrap()
-  assert_true(heading.is_active({ doc: "= title", sel_from: 2, sel_to: 2 }))
-  assert_false(heading.is_active({ doc: "title", sel_from: 2, sel_to: 2 }))
-  assert_true(list.is_active({ doc: "- item", sel_from: 3, sel_to: 3 }))
+  assert_true(heading.is_active({ doc: "= title", sel_from: 2, sel_to: 2, }))
+  assert_false(heading.is_active({ doc: "title", sel_from: 2, sel_to: 2, }))
+  assert_true(list.is_active({ doc: "- item", sel_from: 3, sel_to: 3, }))
 }
 
 ///|
 test "enabled rules for selection and block markers" {
   let commands = @app.default_commands()
   let bold = @app.find_command(commands, "bold").unwrap()
-  assert_false(bold.is_enabled({ doc: "hi", sel_from: 0, sel_to: 0 }))
-  assert_true(bold.is_enabled({ doc: "hi", sel_from: 0, sel_to: 2 }))
+  assert_false(bold.is_enabled({ doc: "hi", sel_from: 0, sel_to: 0, }))
+  assert_true(bold.is_enabled({ doc: "hi", sel_from: 0, sel_to: 2, }))
   let clear = @app.find_command(commands, "clear-marks").unwrap()
-  assert_false(clear.is_enabled({ doc: "plain", sel_from: 0, sel_to: 0 }))
-  assert_true(clear.is_enabled({ doc: "= t", sel_from: 0, sel_to: 0 }))
-  assert_true(clear.is_enabled({ doc: "1. item", sel_from: 0, sel_to: 0 }))
-  assert_true(clear.is_enabled({ doc: "plain", sel_from: 0, sel_to: 3 }))
+  assert_false(clear.is_enabled({ doc: "plain", sel_from: 0, sel_to: 0, }))
+  assert_true(clear.is_enabled({ doc: "= t", sel_from: 0, sel_to: 0, }))
+  assert_true(clear.is_enabled({ doc: "1. item", sel_from: 0, sel_to: 0, }))
+  assert_true(clear.is_enabled({ doc: "plain", sel_from: 0, sel_to: 3, }))
 }

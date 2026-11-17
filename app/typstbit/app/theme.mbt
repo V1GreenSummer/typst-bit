@@ -6,6 +6,7 @@
 // appear here.
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct ThemeSettings {
   theme : String
   accent : String
@@ -13,7 +14,7 @@ pub(all) struct ThemeSettings {
   preview_background : String
   sidebar_width : String
   compact : Bool
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend ThemeSettings with @moonbitlang/core/debug.Debug::{to_repr}
@@ -34,6 +35,7 @@ pub fn ThemeSettings::default() -> ThemeSettings {
 }
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct ThemePlan {
   /// `data-theme` attribute value; `None` removes the attribute.
   body_theme : String?
@@ -41,7 +43,7 @@ pub(all) struct ThemePlan {
   body_classes : Array[(String, Bool)]
   /// CSS variables to set.
   variables : Array[(String, String)]
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend ThemePlan with @moonbitlang/core/debug.Debug::{to_repr}

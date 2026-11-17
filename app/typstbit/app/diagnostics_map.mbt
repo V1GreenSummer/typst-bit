@@ -8,16 +8,17 @@
 // workbench tooltip text.
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct RawDiagnostic {
   severity : String
   message : String
   hints : Array[String]
   file : String?
-  start_line : Int?
-  start_column : Int?
-  end_line : Int?
-  end_column : Int?
-} derive(Debug, Eq)
+  start_line : Int32?
+  start_column : Int32?
+  end_line : Int32?
+  end_column : Int32?
+}
 
 ///|
 pub extend RawDiagnostic with @moonbitlang/core/debug.Debug::{to_repr}
@@ -26,14 +27,15 @@ pub extend RawDiagnostic with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend RawDiagnostic with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct EditorDiagnostic {
   severity : String
   message : String
-  line : Int
-  column : Int
-  end_line : Int
-  end_column : Int
-} derive(Debug, Eq)
+  line : Int32
+  column : Int32
+  end_line : Int32
+  end_column : Int32
+}
 
 ///|
 pub extend EditorDiagnostic with @moonbitlang/core/debug.Debug::{to_repr}
@@ -84,7 +86,7 @@ fn diag_raw_from_fields(fields : Map[String, Json]) -> RawDiagnostic {
 fn diag_position_fields(
   fields : Map[String, Json],
   key : String,
-) -> (Int?, Int?) {
+) -> (Int32?, Int32?) {
   match fields.get(key) {
     Some(Json::Object(position)) =>
       (diag_int(position, "line"), diag_int(position, "column"))
@@ -101,7 +103,7 @@ fn diag_string(fields : Map[String, Json], key : String) -> String? {
 }
 
 ///|
-fn diag_int(fields : Map[String, Json], key : String) -> Int? {
+fn diag_int(fields : Map[String, Json], key : String) -> Int32? {
   match fields.get(key) {
     Some(Json::Number(value, ..)) => Some(value.to_int())
     _ => None

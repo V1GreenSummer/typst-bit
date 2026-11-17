@@ -14,11 +14,11 @@ import {
 // Types and methods
 pub(all) enum Decoration {
   Mark(@core.Range, String)
-  Line(Int, String)
-  Widget(Int, String, String)
-  GutterMarker(Int, String)
-  Fold(Int)
-  Foldable(Int)
+  Line(Int32, String)
+  Widget(Int32, String, String)
+  GutterMarker(Int32, String)
+  Fold(Int32)
+  Foldable(Int32)
 }
 
 pub struct EditorView {
@@ -29,23 +29,23 @@ pub fn EditorView::client_height(Self) -> Double
 pub fn EditorView::client_width(Self) -> Double
 pub fn EditorView::content_element(Self) -> @ffi.JsAny
 pub fn EditorView::destroy(Self) -> Unit
-pub fn EditorView::dispatch_focus(Self, Int) -> Unit
-pub fn EditorView::dispatch_mouse(Self, Int, Double, Double, Int) -> Bool
+pub fn EditorView::dispatch_focus(Self, Int32) -> Unit
+pub fn EditorView::dispatch_mouse(Self, Int32, Double, Double, Int32) -> Bool
 pub fn EditorView::dispatch_scroll(Self, Double, Double) -> Unit
 pub fn EditorView::ensure_cursor_visible_public(Self) -> Unit
 pub fn EditorView::focus(Self) -> Unit
-pub fn EditorView::id(Self) -> Int
-pub fn EditorView::new(@ffi.JsAny, Int, @state.EditorState, ViewOptions) -> Self
+pub fn EditorView::id(Self) -> Int32
+pub fn EditorView::new(@ffi.JsAny, Int32, @state.EditorState, ViewOptions) -> Self
 pub fn EditorView::options(Self) -> ViewOptions
-pub fn EditorView::pos_at_coords_public(Self, Double, Double) -> Int
+pub fn EditorView::pos_at_coords_public(Self, Double, Double) -> Int32
 pub fn EditorView::render(Self) -> Unit
-pub fn EditorView::replace_range(Self, Int, Int, String) -> Unit
+pub fn EditorView::replace_range(Self, Int32, Int32, String) -> Unit
 pub fn EditorView::scroll_top(Self) -> Double
-pub fn EditorView::select_range(Self, Int, Int) -> Unit
+pub fn EditorView::select_range(Self, Int32, Int32) -> Unit
 pub fn EditorView::selected_text(Self) -> @ffi.JsAny
 pub fn EditorView::set_decorations_provider(Self, (@state.EditorState) -> Array[Decoration]) -> Unit
 pub fn EditorView::set_doc(Self, String) -> Unit
-pub fn EditorView::set_line_filter(Self, (@state.EditorState, Int) -> Bool) -> Unit
+pub fn EditorView::set_line_filter(Self, (@state.EditorState, Int32) -> Bool) -> Unit
 pub fn EditorView::set_options(Self, ViewOptions) -> Unit
 pub fn EditorView::set_state(Self, @state.EditorState) -> Unit
 pub fn EditorView::state(Self) -> @state.EditorState
@@ -58,7 +58,7 @@ pub struct LineLayout {
 pub(all) struct ViewOptions {
   line_numbers : Bool
   line_wrapping : Bool
-  tab_size : Int
+  tab_size : Int32
   read_only : Bool
   theme : String
   font : String
@@ -72,7 +72,7 @@ pub fn ViewOptions::with_line_height(Self, Double) -> Self
 pub fn ViewOptions::with_line_numbers(Self, Bool) -> Self
 pub fn ViewOptions::with_line_wrapping(Self, Bool) -> Self
 pub fn ViewOptions::with_read_only(Self, Bool) -> Self
-pub fn ViewOptions::with_tab_size(Self, Int) -> Self
+pub fn ViewOptions::with_tab_size(Self, Int32) -> Self
 pub fn ViewOptions::with_theme(Self, String) -> Self
 
 // Type aliases

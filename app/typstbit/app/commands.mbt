@@ -7,11 +7,12 @@
 // the active/enabled predicates.
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct EditorView {
   doc : String
-  sel_from : Int
-  sel_to : Int
-} derive(Debug, Eq)
+  sel_from : Int32
+  sel_to : Int32
+}
 
 ///|
 pub extend EditorView with @moonbitlang/core/debug.Debug::{to_repr}
@@ -20,11 +21,12 @@ pub extend EditorView with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend EditorView with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 pub(all) enum ActiveRule {
   NoActive
   Wrap(before~ : String, after~ : String)
   LinePrefix(prefix~ : String)
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend ActiveRule with @moonbitlang/core/debug.Debug::{to_repr}
@@ -33,11 +35,12 @@ pub extend ActiveRule with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend ActiveRule with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 pub(all) enum EnabledRule {
   AlwaysEnabled
   NeedSelection
   NeedSelectionOrLineMarker
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend EnabledRule with @moonbitlang/core/debug.Debug::{to_repr}
@@ -46,6 +49,7 @@ pub extend EnabledRule with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend EnabledRule with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct CommandSpec {
   id : String
   label : String
@@ -53,7 +57,7 @@ pub(all) struct CommandSpec {
   shortcut : String?
   active : ActiveRule
   enabled_rule : EnabledRule
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend CommandSpec with @moonbitlang/core/debug.Debug::{to_repr}
@@ -62,10 +66,11 @@ pub extend CommandSpec with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend CommandSpec with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct MenuItem {
   id : String
   label : String?
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend MenuItem with @moonbitlang/core/debug.Debug::{to_repr}
@@ -74,10 +79,11 @@ pub extend MenuItem with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend MenuItem with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct MenuSpec {
   label : String
   items : Array[MenuItem]
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend MenuSpec with @moonbitlang/core/debug.Debug::{to_repr}
@@ -86,11 +92,12 @@ pub extend MenuSpec with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend MenuSpec with Eq::{not_equal, equal}
 
 ///|
+#derive(Debug, Eq)
 pub(all) struct ButtonSpec {
   id : String
   label : String
   variant : String?
-} derive(Debug, Eq)
+}
 
 ///|
 pub extend ButtonSpec with @moonbitlang/core/debug.Debug::{to_repr}
@@ -99,7 +106,7 @@ pub extend ButtonSpec with @moonbitlang/core/debug.Debug::{to_repr}
 pub extend ButtonSpec with Eq::{not_equal, equal}
 
 ///|
-fn line_start_of(doc : String, index : Int) -> Int {
+fn line_start_of(doc : String, index : Int32) -> Int32 {
   let chars = doc.to_array()
   let len = chars.length()
   let limit = if index < 0 { 0 } else if index > len { len } else { index }
@@ -113,7 +120,7 @@ fn line_start_of(doc : String, index : Int) -> Int {
 }
 
 ///|
-fn line_text(doc : String, index : Int) -> String {
+fn line_text(doc : String, index : Int32) -> String {
   let chars = doc.to_array()
   let start = line_start_of(doc, index)
   let buf = StringBuilder()
@@ -154,7 +161,7 @@ pub fn EditorView::selection_is_empty(self : EditorView) -> Bool {
 }
 
 ///|
-pub fn EditorView::slice(self : EditorView, from : Int, to : Int) -> String {
+pub fn EditorView::slice(self : EditorView, from : Int32, to : Int32) -> String {
   let chars = self.doc.to_array()
   let len = chars.length()
   let start = if from < 0 { 0 } else if from > len { len } else { from }
@@ -228,11 +235,11 @@ fn command(
   id : String,
   label : String,
   category : String,
-  shortcut? : String? = None,
-  active? : ActiveRule = NoActive,
-  enabled? : EnabledRule = AlwaysEnabled,
+  shortcut~ : String? = None,
+  active~ : ActiveRule = NoActive,
+  enabled~ : EnabledRule = AlwaysEnabled,
 ) -> CommandSpec {
-  { id, label, category, shortcut, active, enabled_rule: enabled }
+  { id, label, category, shortcut, active, enabled_rule: enabled, }
 }
 
 ///|
@@ -292,52 +299,52 @@ pub fn menu_structure() -> Array[MenuSpec] {
     {
       label: "File",
       items: [
-        { id: "reset-example", label: Some("恢复示例") },
-        { id: "export-pdf", label: Some("导出 PDF") },
-        { id: "share", label: Some("复制分享链接") },
+        { id: "reset-example", label: Some("恢复示例"), },
+        { id: "export-pdf", label: Some("导出 PDF"), },
+        { id: "share", label: Some("复制分享链接"), },
       ],
     },
     {
       label: "Edit",
       items: [
-        { id: "open-search", label: Some("查找替换 ⌘F") },
-        { id: "undo", label: Some("撤销 ⌘Z") },
-        { id: "redo", label: Some("重做 ⇧⌘Z") },
+        { id: "open-search", label: Some("查找替换 ⌘F"), },
+        { id: "undo", label: Some("撤销 ⌘Z"), },
+        { id: "redo", label: Some("重做 ⇧⌘Z"), },
       ],
     },
     {
       label: "View",
       items: [
-        { id: "open-pdf-tab", label: Some("新标签页打开 PDF") },
-        { id: "export-pdf", label: Some("下载 PDF") },
-        { id: "reset-example", label: Some("重置示例") },
+        { id: "open-pdf-tab", label: Some("新标签页打开 PDF"), },
+        { id: "export-pdf", label: Some("下载 PDF"), },
+        { id: "reset-example", label: Some("重置示例"), },
       ],
     },
-    { label: "Help", items: [{ id: "shortcuts", label: Some("快捷键") }] },
+    { label: "Help", items: [{ id: "shortcuts", label: Some("快捷键"), }], },
   ]
 }
 
 ///|
 pub fn format_buttons() -> Array[ButtonSpec] {
   [
-    { id: "clear-marks", label: "清除标记", variant: None },
-    { id: "bold", label: "加粗", variant: None },
-    { id: "italic", label: "斜体", variant: None },
-    { id: "underline", label: "下划线", variant: None },
-    { id: "heading", label: "标题", variant: None },
-    { id: "list", label: "列表", variant: None },
-    { id: "math", label: "数学", variant: None },
-    { id: "codeblock", label: "代码块", variant: None },
-    { id: "quote", label: "引用", variant: None },
-    { id: "open-search", label: "⌕ 搜索", variant: None },
+    { id: "clear-marks", label: "清除标记", variant: None, },
+    { id: "bold", label: "加粗", variant: None, },
+    { id: "italic", label: "斜体", variant: None, },
+    { id: "underline", label: "下划线", variant: None, },
+    { id: "heading", label: "标题", variant: None, },
+    { id: "list", label: "列表", variant: None, },
+    { id: "math", label: "数学", variant: None, },
+    { id: "codeblock", label: "代码块", variant: None, },
+    { id: "quote", label: "引用", variant: None, },
+    { id: "open-search", label: "⌕ 搜索", variant: None, },
   ]
 }
 
 ///|
 pub fn topbar_actions() -> Array[ButtonSpec] {
   [
-    { id: "share", label: "分享", variant: None },
-    { id: "export-pdf", label: "导出 PDF", variant: None },
-    { id: "compile-now", label: "立即编译", variant: Some("primary") },
+    { id: "share", label: "分享", variant: None, },
+    { id: "export-pdf", label: "导出 PDF", variant: None, },
+    { id: "compile-now", label: "立即编译", variant: Some("primary"), },
   ]
 }

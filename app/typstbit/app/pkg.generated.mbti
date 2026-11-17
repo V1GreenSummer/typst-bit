@@ -4,10 +4,11 @@ package "V1GreenSummer/typstbit/app"
 import {
   "V1GreenSummer/typstbit/typst_binding",
   "moonbitlang/core/debug",
+  "moonbitlang/core/json",
 }
 
 // Values
-pub const DEBOUNCE_MS : Int = 300
+pub const DEBOUNCE_MS : Int32 = 300
 
 pub const DEFAULT_SOURCE : String = "#set page(width: 20cm, height: 10cm)\n= Hello, Typst!\n\n#lorem(60)"
 
@@ -41,7 +42,7 @@ pub fn parse_raw_diagnostics(String) -> Array[RawDiagnostic]
 
 pub fn parse_spec(String) -> PackageSpec?
 
-pub fn parse_spec_at(Array[Char], Int) -> PackageSpec?
+pub fn parse_spec_at(Array[Char], Int32) -> PackageSpec?
 
 pub fn plan_theme(ThemeSettings) -> ThemePlan
 
@@ -58,32 +59,36 @@ pub fn update(Model, Msg) -> (Model, Array[Action])
 // Errors
 
 // Types and methods
+#derive(Eq, @debug.Debug)
 pub(all) enum Action {
-  StartCompile(revision~ : Int, source~ : String)
-  RequestPageImage(revision~ : Int, page~ : Int)
-} derive(Eq, @debug.Debug)
+  StartCompile(revision~ : Int32, source~ : String)
+  RequestPageImage(revision~ : Int32, page~ : Int32)
+}
 pub fn Action::equal(Self, Self) -> Bool
 pub fn Action::not_equal(Self, Self) -> Bool
 pub fn Action::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ActiveRule {
   NoActive
   Wrap(before~ : String, after~ : String)
   LinePrefix(prefix~ : String)
-} derive(Eq, @debug.Debug)
+}
 pub fn ActiveRule::equal(Self, Self) -> Bool
 pub fn ActiveRule::not_equal(Self, Self) -> Bool
 pub fn ActiveRule::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct ButtonSpec {
   id : String
   label : String
   variant : String?
-} derive(Eq, @debug.Debug)
+}
 pub fn ButtonSpec::equal(Self, Self) -> Bool
 pub fn ButtonSpec::not_equal(Self, Self) -> Bool
 pub fn ButtonSpec::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct CommandSpec {
   id : String
   label : String
@@ -91,94 +96,102 @@ pub(all) struct CommandSpec {
   shortcut : String?
   active : ActiveRule
   enabled_rule : EnabledRule
-} derive(Eq, @debug.Debug)
+}
 pub fn CommandSpec::equal(Self, Self) -> Bool
 pub fn CommandSpec::is_active(Self, EditorView) -> Bool
 pub fn CommandSpec::is_enabled(Self, EditorView) -> Bool
 pub fn CommandSpec::not_equal(Self, Self) -> Bool
 pub fn CommandSpec::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum CompileStatus {
   Idle
   Compiling
-  Success(pages~ : Int, warnings~ : Int)
-  Failed(errors~ : Int, warnings~ : Int)
-} derive(Eq, @debug.Debug)
+  Success(pages~ : Int32, warnings~ : Int32)
+  Failed(errors~ : Int32, warnings~ : Int32)
+}
 pub fn CompileStatus::equal(Self, Self) -> Bool
 pub fn CompileStatus::not_equal(Self, Self) -> Bool
 pub fn CompileStatus::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct EditorDiagnostic {
   severity : String
   message : String
-  line : Int
-  column : Int
-  end_line : Int
-  end_column : Int
-} derive(Eq, @debug.Debug)
+  line : Int32
+  column : Int32
+  end_line : Int32
+  end_column : Int32
+}
 pub fn EditorDiagnostic::equal(Self, Self) -> Bool
 pub fn EditorDiagnostic::not_equal(Self, Self) -> Bool
 pub fn EditorDiagnostic::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct EditorView {
   doc : String
-  sel_from : Int
-  sel_to : Int
-} derive(Eq, @debug.Debug)
+  sel_from : Int32
+  sel_to : Int32
+}
 pub fn EditorView::equal(Self, Self) -> Bool
 pub fn EditorView::not_equal(Self, Self) -> Bool
 pub fn EditorView::selection_is_empty(Self) -> Bool
-pub fn EditorView::slice(Self, Int, Int) -> String
+pub fn EditorView::slice(Self, Int32, Int32) -> String
 pub fn EditorView::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum EnabledRule {
   AlwaysEnabled
   NeedSelection
   NeedSelectionOrLineMarker
-} derive(Eq, @debug.Debug)
+}
 pub fn EnabledRule::equal(Self, Self) -> Bool
 pub fn EnabledRule::not_equal(Self, Self) -> Bool
 pub fn EnabledRule::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum FileKind {
   TextFile
   BinaryFile
-} derive(Eq, @debug.Debug)
+}
 pub fn FileKind::equal(Self, Self) -> Bool
 pub fn FileKind::not_equal(Self, Self) -> Bool
 pub fn FileKind::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct MenuItem {
   id : String
   label : String?
-} derive(Eq, @debug.Debug)
+}
 pub fn MenuItem::equal(Self, Self) -> Bool
 pub fn MenuItem::not_equal(Self, Self) -> Bool
 pub fn MenuItem::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct MenuSpec {
   label : String
   items : Array[MenuItem]
-} derive(Eq, @debug.Debug)
+}
 pub fn MenuSpec::equal(Self, Self) -> Bool
 pub fn MenuSpec::not_equal(Self, Self) -> Bool
 pub fn MenuSpec::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct Model {
   source : String
   pending : Bool
-  deadline : Int
-  current_revision : Int
-  doc_revision : Int?
-  page_count : Int
-  current_page : Int
+  deadline : Int32
+  current_revision : Int32
+  doc_revision : Int32?
+  page_count : Int32
+  current_page : Int32
   preview_source : String?
-  pending_image_page : Int?
+  pending_image_page : Int32?
   preview_ready : Bool
   preview_failed : Bool
   status : CompileStatus
   diagnostics : Array[@typst_binding.Diagnostic]
-} derive(Eq, @debug.Debug)
+}
 pub fn Model::can_go_next(Self) -> Bool
 pub fn Model::can_go_prev(Self) -> Bool
 pub fn Model::equal(Self, Self) -> Bool
@@ -186,49 +199,53 @@ pub fn Model::init(initial_source~ : String) -> Self
 pub fn Model::not_equal(Self, Self) -> Bool
 pub fn Model::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum Msg {
-  SourceEdited(source~ : String, now_ms~ : Int)
-  DebounceTick(now_ms~ : Int)
+  SourceEdited(source~ : String, now_ms~ : Int32)
+  DebounceTick(now_ms~ : Int32)
   CompileNow
-  ResetSource(now_ms~ : Int)
-  CompileSucceeded(revision~ : Int, page_count~ : Int, warnings~ : Int)
-  CompileFailed(revision~ : Int, diagnostics~ : Array[@typst_binding.Diagnostic])
-  PreviewSource(revision~ : Int, page~ : Int, source~ : String)
-  PreviewFailed(revision~ : Int, page~ : Int)
-  ImageReady(revision~ : Int)
-  ImageFailed(revision~ : Int)
+  ResetSource(now_ms~ : Int32)
+  CompileSucceeded(revision~ : Int32, page_count~ : Int32, warnings~ : Int32)
+  CompileFailed(revision~ : Int32, diagnostics~ : Array[@typst_binding.Diagnostic])
+  PreviewSource(revision~ : Int32, page~ : Int32, source~ : String)
+  PreviewFailed(revision~ : Int32, page~ : Int32)
+  ImageReady(revision~ : Int32)
+  ImageFailed(revision~ : Int32)
   PrevPage
   NextPage
-  GotoPage(page~ : Int)
-} derive(Eq, @debug.Debug)
+  GotoPage(page~ : Int32)
+}
 pub fn Msg::equal(Self, Self) -> Bool
 pub fn Msg::not_equal(Self, Self) -> Bool
 pub fn Msg::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct OutlineEntry {
-  level : Int
+  level : Int32
   title : String
-  line : Int
-} derive(Eq, @debug.Debug)
+  line : Int32
+}
 pub fn OutlineEntry::equal(Self, Self) -> Bool
 pub fn OutlineEntry::not_equal(Self, Self) -> Bool
 pub fn OutlineEntry::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct PackageSpec {
   ns : String
   name : String
   version : String
   text : String
-} derive(Eq, @debug.Debug)
+}
 pub fn PackageSpec::equal(Self, Self) -> Bool
 pub fn PackageSpec::not_equal(Self, Self) -> Bool
 pub fn PackageSpec::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct Project {
   mut files : Array[ProjectFile]
   mut folders : Array[String]
   mut active : String
-} derive(Eq, @debug.Debug)
+}
 pub fn Project::active_text(Self) -> String
 pub fn Project::add_file(Self, String, String, kind? : FileKind) -> Result[Unit, ProjectError]
 pub fn Project::add_folder(Self, String) -> Bool
@@ -243,50 +260,55 @@ pub fn Project::paths(Self) -> Array[String]
 pub fn Project::remove(Self, String) -> ProjectFile?
 pub fn Project::set_text(Self, String, String) -> Bool
 pub fn Project::text(Self, String) -> String?
-pub fn Project::to_json(Self) -> Json
+pub fn Project::to_json(Self) -> @json.Json
 pub fn Project::to_json_string(Self) -> String
 pub fn Project::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) enum ProjectError {
   DuplicatePath(String)
   InvalidPath(String)
-} derive(Eq, @debug.Debug)
+}
 pub fn ProjectError::equal(Self, Self) -> Bool
 pub fn ProjectError::not_equal(Self, Self) -> Bool
 pub fn ProjectError::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct ProjectFile {
   path : String
   kind : FileKind
   text : String
-} derive(Eq, @debug.Debug)
+}
 pub fn ProjectFile::equal(Self, Self) -> Bool
 pub fn ProjectFile::not_equal(Self, Self) -> Bool
 pub fn ProjectFile::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct RawDiagnostic {
   severity : String
   message : String
   hints : Array[String]
   file : String?
-  start_line : Int?
-  start_column : Int?
-  end_line : Int?
-  end_column : Int?
-} derive(Eq, @debug.Debug)
+  start_line : Int32?
+  start_column : Int32?
+  end_line : Int32?
+  end_column : Int32?
+}
 pub fn RawDiagnostic::equal(Self, Self) -> Bool
 pub fn RawDiagnostic::not_equal(Self, Self) -> Bool
 pub fn RawDiagnostic::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct ThemePlan {
   body_theme : String?
   body_classes : Array[(String, Bool)]
   variables : Array[(String, String)]
-} derive(Eq, @debug.Debug)
+}
 pub fn ThemePlan::equal(Self, Self) -> Bool
 pub fn ThemePlan::not_equal(Self, Self) -> Bool
 pub fn ThemePlan::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct ThemeSettings {
   theme : String
   accent : String
@@ -294,7 +316,7 @@ pub(all) struct ThemeSettings {
   preview_background : String
   sidebar_width : String
   compact : Bool
-} derive(Eq, @debug.Debug)
+}
 pub fn ThemeSettings::default() -> Self
 pub fn ThemeSettings::equal(Self, Self) -> Bool
 pub fn ThemeSettings::not_equal(Self, Self) -> Bool
